@@ -17,9 +17,12 @@ Storage layout::
         _checkpoint.json
 
     data/upstox_options/
-        {tradingsymbol}.parquet   (per-contract)
+        {underlying}/               (WIPRO, NIFTY, RELIANCE, …)
+            {expiry_yyyymmdd}/      (260630, 260609, 260731, …)
+                {tradingsymbol}.parquet   (WIPRO26JUN160CE.parquet)
         _contracts.parquet        (contract manifest)
         _checkpoint.json
+        {tradingsymbol}.parquet   (legacy flat files from previous runs)
 """
 
 from __future__ import annotations
@@ -244,20 +247,132 @@ class FileStorageRepository:
     # Per-contract (options/futures)
     # ------------------------------------------------------------------
 
-    def save_option(self, df: pd.DataFrame, provider: str, symbol: str) -> None:
-        """Save candle data for a single option/future contract."""
+    @staticmethod
+    def _parse_fno_underlying(symbol: str) -> str:
+        """Extract the short underlying name from a tradingsymbol.
+
+        Returns the leading alpha characters (e.g. ``'WIPRO'``, ``'NIFTY'``).
+        """
+        import re
+        m = re.match(r'^([A-Za-z]+)', symbol)
+        return m.group(1).upper() if m else ""
+
+    @staticmethod
+    def _parse_fno_symbol(symbol: str) -> tuple[str, str]:
+        """Parse NSE F&O tradingsymbol into (underlying, expiry_short).
+
+        Handles two formats:
+
+        **Stock options / futures** (``YYMON``):
+            ``WIPRO26JUN160CE`` -> ``('WIPRO', '26JUN')``
+            ``WIPRO26JUNFUT``   -> ``('WIPRO', '26JUN')``
+
+        **Index options** (``YYMMDD``):
+            ``NIFTY26060921100CE`` -> ``('NIFTY', '260609')``
+
+        Returns ``('', '')`` if no format matches.
+        """
+        import re
+        # Try stock format: leading alphas + 2-digit year + 3-letter month
+        m = re.match(r'^([A-Za-z]+)(\d{2}[A-Za-z]{3})', symbol)
+        if m:
+            return m.group(1).upper(), m.group(2).upper()
+        # Try index format: leading alphas + 6 digits (YYMMDD)
+        m = re.match(r'^([A-Za-z]+)(\d{2}(?:0[1-9]|1[012])(?:0[1-9]|[12]\d|3[01]))', symbol)
+        if m:
+            return m.group(1).upper(), m.group(2)
+        return "", ""
+
+    def options_path(
+        self, provider: str, symbol: str,
+        underlying: str | None = None,
+        expiry_date: str | None = None,
+    ) -> Path:
+        """Path to an individual option contract file.
+
+        Subdirectory layout ``{underlying}/{expiry_folder}/{symbol}.parquet``.
+        ``expiry_folder`` is derived from ``expiry_date`` (``YYMMDD`` format)
+        or parsed from the tradingsymbol as a fallback.
+        """
+        base = self.base_dir(provider)
+        ext = self._ext()
+        # Resolve underlying name: argument > parse from tradingsymbol
+        name = (underlying or self._parse_fno_underlying(symbol)).upper()
+        if not name:
+            return base / f"{symbol}{ext}"
+
+        # Build expiry folder from the expiry date (preferred) or tradingsymbol
+        if expiry_date:
+            try:
+                dt = pd.to_datetime(expiry_date)
+                exp_folder = dt.strftime("%y%m%d")  # e.g. "260630"
+            except Exception:
+                _, exp_folder = self._parse_fno_symbol(symbol)
+                if not exp_folder:
+                    return base / f"{symbol}{ext}"
+        else:
+            _, exp_folder = self._parse_fno_symbol(symbol)
+            if not exp_folder:
+                return base / f"{symbol}{ext}"
+
+        return base / name / exp_folder / f"{symbol}{ext}"
+
+    def save_option(
+        self, df: pd.DataFrame, provider: str, symbol: str,
+        underlying: str | None = None,
+        expiry_date: str | None = None,
+    ) -> None:
+        """Save candle data for a single option/future contract.
+
+        Args:
+            df: Candle DataFrame.
+            provider: Provider name.
+            symbol: Tradingsymbol.
+            underlying: Short underlying name for folder structure.
+            expiry_date: Expiry date string (``YYYY-MM-DD``) for folder structure.
+        """
         if df.empty:
             return
-        path = self.options_path(provider, symbol)
+        path = self.options_path(
+            provider, symbol,
+            underlying=underlying,
+            expiry_date=expiry_date,
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
         self._write_func()(df, path)
 
-    def load_option(self, provider: str, symbol: str) -> pd.DataFrame:
+    def load_option(
+        self, provider: str, symbol: str,
+        underlying: str | None = None,
+        expiry_date: str | None = None,
+    ) -> pd.DataFrame:
         """Load candle data for a single contract."""
-        path = self.options_path(provider, symbol)
+        path = self.options_path(
+            provider, symbol,
+            underlying=underlying,
+            expiry_date=expiry_date,
+        )
         if not path.exists():
             return pd.DataFrame()
         return self._read_func()(path)
 
     def list_option_symbols(self, provider: str) -> list[str]:
-        """List all contract tradingsymbols with stored data."""
-        return self.list_symbols(provider)
+        """List all contract tradingsymbols with stored data.
+
+        Recursively walks ``{underlying}/{expiry_short}/`` subdirectories.
+        """
+        base = self.base_dir(provider)
+        ext = self._ext()
+        symbols: list[str] = []
+        # Walk flat files at base level (legacy)
+        for f in sorted(glob.glob(os.path.join(base, f"*{ext}"))):
+            stem = Path(f).stem
+            if not stem.startswith("_") and stem != "indices":
+                symbols.append(stem)
+        # Walk subdirectory structure
+        pattern = os.path.join(base, "*", "*", f"*{ext}")
+        for f in sorted(glob.glob(pattern)):
+            stem = Path(f).stem
+            if not stem.startswith("_"):
+                symbols.append(stem)
+        return sorted(set(symbols))

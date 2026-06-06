@@ -217,9 +217,22 @@ data/
     └── upstox_options/           # F&O data
         ├── _checkpoint.json
         ├── _contracts.parquet    # 📋 Contract manifest (expiry-queryable)
-        ├── NIFTY26JUN23600CE.parquet
-        ├── NIFTY26JUN23600PE.parquet
-        └── ...
+        ├── NIFTY/
+        │   ├── 260609/           # Expiry 2026-06-09 (weekly)
+        │   │   ├── NIFTY26060923600CE.parquet
+        │   │   └── ...
+        │   └── 260630/           # Expiry 2026-06-30 (monthly)
+        │       ├── NIFTY26JUN23600CE.parquet
+        │       └── ...
+        ├── WIPRO/
+        │   ├── 260630/
+        │   │   ├── WIPRO26JUN160CE.parquet
+        │   │   └── ...
+        │   └── 260731/
+        │       └── ...
+        ├── RELIANCE/
+        │   └── ...
+        └── (legacy flat files from previous runs)
 ```
 
 ### Querying the contract manifest

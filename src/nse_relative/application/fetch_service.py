@@ -116,6 +116,7 @@ class FetchService:
         self,
         provider: str,
         index: str = "",
+        underlying: str | None = None,
         symbols: list[str] | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
@@ -131,6 +132,8 @@ class FetchService:
         Args:
             provider: One of ``'nse'``, ``'upstox'``, ``'upstox_options'``.
             index: NSE index name for symbol sourcing.
+            underlying: Single underlying name to restrict F&O fetch to
+                        (e.g. "WIPRO", "NIFTY").
             symbols: Optional list of specific symbols to fetch.
             start_date: Fetch start (DD-MM-YYYY).
             end_date: Fetch end (DD-MM-YYYY).
@@ -173,4 +176,4 @@ class FetchService:
                 end_date=end_date,
                 force=force,
             )
-            p.fetch_options(symbols=symbols)
+            p.fetch_options(symbols=symbols, underlying=underlying)

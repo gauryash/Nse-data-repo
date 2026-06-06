@@ -56,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"NSE index to source symbols from (default: {DEFAULT_NSE_INDEX})",
     )
     fetch_parser.add_argument(
+        "--underlying",
+        default=None,
+        help="Single underlying stock/index name for F&O fetch "
+             "(e.g. WIPRO, NIFTY, RELIANCE); filters contract discovery",
+    )
+    fetch_parser.add_argument(
         "--symbols", "-s", nargs="*",
         help="Specific symbols (NSE: symbols; Upstox: tradingsymbols)",
     )
@@ -122,6 +128,7 @@ def _cmd_fetch(args: argparse.Namespace) -> None:
     service.fetch(
         provider=args.provider,
         index=args.index,
+        underlying=args.underlying,
         symbols=args.symbols,
         start_date=args.start_date,
         end_date=args.end_date,

@@ -154,12 +154,16 @@ class UpstoxOptionsProvider(DataProvider):
         self,
         symbols: Optional[list[str]] = None,
         n_expiries: int | None = None,
+        underlying: str | None = None,
     ) -> None:
         """Fetch historical candle data for F&O contracts and persist.
 
         Args:
             symbols: Optional list of tradingsymbols to restrict fetching.
             n_expiries: Override number of upcoming expiry cycles.
+            underlying: Single underlying stock/index name to restrict to
+                        (e.g. "WIPRO", "NIFTY"). Filters on the ``name``
+                        column of the contract discovery DataFrame.
         """
         effective_n = self._n_expiries if n_expiries is None else n_expiries
 
@@ -183,6 +187,29 @@ class UpstoxOptionsProvider(DataProvider):
                 "Check the instrument master CSV or NSE index name."
             )
             return
+
+        # Filter to a single underlying stock/index (e.g. "WIPRO", "NIFTY")
+        if underlying is not None and symbols is None:
+            before = len(symboldf)
+            # Extract short underlying name from tradingsymbol
+            # Format: <SYMBOL><YY><MON><STRIKE><OPT> (e.g. "WIPRO26JUN2160CE")
+            symboldf = symboldf.copy()
+            symboldf["_underlying_short"] = symboldf["tradingsymbol"].str.extract(
+                r"^([A-Za-z]+)", expand=False
+            )
+            matches = symboldf["_underlying_short"].str.upper() == underlying.upper()
+            symboldf = symboldf[matches]
+            if symboldf.empty:
+                logger.warning(
+                    "Underlying '%s' not found among %d discovered contracts — "
+                    "check spelling (expected: RELIANCE, WIPRO, NIFTY, etc.)",
+                    underlying, before,
+                )
+                return
+            logger.info(
+                "Underlying filter '%s': %d -> %d contracts",
+                underlying, before, len(symboldf),
+            )
 
         # Ensure unique integer index to avoid .loc[i] returning a DataFrame
         symboldf = symboldf.reset_index(drop=True)
@@ -209,11 +236,20 @@ class UpstoxOptionsProvider(DataProvider):
                 idx = fut_map[future]
                 row = symboldf.loc[idx]
                 symbol = row["tradingsymbol"]
+                # Extract short underlying name from tradingsymbol for folder structure
+                underlying_short = FileStorageRepository._parse_fno_underlying(symbol)
+                # Get expiry date from row metadata
+                expiry_val = row.get("expiry")
+                expiry_date_str = str(expiry_val) if pd.notna(expiry_val) else None
                 try:
                     df = future.result()
                     if df is not None:
                         df = self._attach_metadata(df, row)
-                        self._storage.save_option(df, self.provider, symbol)
+                        self._storage.save_option(
+                            df, self.provider, symbol,
+                            underlying=underlying_short,
+                            expiry_date=expiry_date_str,
+                        )
                         dmin = df["date"].min()
                         dmax = df["date"].max()
                         meta = self._manifest.build_checkpoint_entry(row)

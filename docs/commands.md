@@ -26,6 +26,7 @@ nse-relative fetch [options]
 |---|---|---|---|---|
 | `--provider` | `-p` | `nse` / `upstox` / `upstox_options` | `nse` | Data source |
 | `--index` | `-x` | *one of 21 NSE indices* | `nifty500` | NSE index for symbol sourcing |
+| `--underlying` | — | string | *(none)* | Single stock/index name for F&O (e.g. WIPRO, NIFTY, RELIANCE) |
 | `--symbols` | `-s` | space-separated list | *(all)* | Restrict to specific symbols |
 | `--start` / `--from` | — | `DD-MM-YYYY` | env default | Fetch start date |
 | `--end` / `--to` | — | `DD-MM-YYYY` | env / today | Fetch end date |
@@ -145,6 +146,34 @@ nse-relative fetch --provider upstox_options --index nifty50 \
 # Weekly candle interval
 nse-relative fetch --provider upstox_options --index nifty50 \
   --interval week
+```
+
+#### Single Stock Options (`--underlying`)
+
+Fetch options for just **one** underlying stock instead of a whole index.
+Uses the Nifty 500 index as the default symbol universe, then filters
+down to the matching stock by extracting the short name from the
+tradingsymbol (e.g. `WIPRO26JUN160CE` → `WIPRO`).
+
+```bash
+# All options for WIPRO (default: next 2 expiries)
+nse-relative fetch --provider upstox_options --underlying WIPRO
+
+# With date range
+nse-relative fetch --provider upstox_options --underlying WIPRO \
+  --start 01-01-2024 --end 06-06-2026
+
+# Next 5 expiries for WIPRO
+nse-relative fetch --provider upstox_options --underlying WIPRO \
+  --n-expiries 5
+
+# All expiries (0 = disable filter)
+nse-relative fetch --provider upstox_options --underlying WIPRO \
+  --n-expiries 0
+
+# Index options for a single index (NIFTY, BANKNIFTY, etc.)
+nse-relative fetch --provider upstox_options --underlying NIFTY \
+  --instrument-types OPTIDX
 ```
 
 #### Index Options
@@ -304,6 +333,26 @@ nse-relative fetch -p upstox_options -x nifty50 --n-expiries 0
 nse-relative fetch -p nse --force
 nse-relative fetch -p upstox --force
 nse-relative fetch -p upstox_options --force
+
+# ═══════════════════════════════════════════════════════════
+# SINGLE STOCK F&O (--underlying)
+# ═══════════════════════════════════════════════════════════
+
+# WIPRO — next 2 expiries (default)
+nse-relative fetch -p upstox_options --underlying WIPRO
+
+# WIPRO — last 5 expiries
+nse-relative fetch -p upstox_options --underlying WIPRO --n-expiries 5
+
+# WIPRO — full date range
+nse-relative fetch -p upstox_options --underlying WIPRO \
+  --start 01-01-2024 --end 06-06-2026
+
+# RELIANCE — all expiries (disable expiry filter)
+nse-relative fetch -p upstox_options --underlying RELIANCE --n-expiries 0
+
+# NIFTY index options (single index)
+nse-relative fetch -p upstox_options --underlying NIFTY -t OPTIDX
 
 # ═══════════════════════════════════════════════════════════
 # SPECIFIC SYMBOLS

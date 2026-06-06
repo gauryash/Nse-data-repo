@@ -123,7 +123,7 @@ class NSEProvider(DataProvider):
         )
 
         logger.info(
-            "NSE equities: %d symbols, %s → %s (%d chunk(s)), force=%s",
+            "NSE equities: %d symbols, %s -> %s (%d chunk(s)), force=%s",
             len(symbols), self._start, self._end,
             len(date_chunks), self._force,
         )
@@ -179,7 +179,7 @@ class NSEProvider(DataProvider):
 
     def fetch_index(self) -> None:
         """Fetch Nifty 500 index data and persist."""
-        logger.info("NSE index: fetching %s …", settings.nse_benchmark)
+        logger.info("NSE index: fetching %s ..", settings.nse_benchmark)
 
         graph_data = self._client.fetch_index_chart(settings.nse_benchmark)
         if graph_data:

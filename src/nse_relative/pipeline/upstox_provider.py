@@ -124,7 +124,7 @@ class UpstoxProvider(DataProvider):
         if df is not None and not df.empty:
             df["symbol"] = symbol
             logger.info(
-                "%s: %d rows [%s … %s]",
+                "%s: %d rows [%s .. %s]",
                 symbol, len(df),
                 df["date"].min().strftime("%Y-%m-%d"),
                 df["date"].max().strftime("%Y-%m-%d"),
@@ -146,7 +146,7 @@ class UpstoxProvider(DataProvider):
             symboldf = symboldf[symboldf["tradingsymbol"].isin(symbols)]
 
         logger.info(
-            "Upstox: %d symbols, interval=%s, range=[%s … %s], force=%s",
+            "Upstox: %d symbols, interval=%s, range=[%s .. %s], force=%s",
             len(symboldf), self._interval,
             self._start.strftime("%Y-%m-%d"),
             self._end.strftime("%Y-%m-%d"),

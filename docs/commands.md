@@ -1,212 +1,253 @@
-# 📋 NSE Data Pipeline — Command Reference
+# 📋 NSE Data Pipeline — Complete Command Reference
 
-> **Full command reference for `nse-relative` CLI**
+> Full reference for every `nse-relative` command and option.
+> Also available at: `nse-relative --help` / `nse-relative fetch --help`
 
 ---
 
-## 🔹 `fetch` — Data Fetching
+## 🔹 Global Options
+
+| Option | Description |
+|---|---|
+| `--version` | Print version number and exit |
+| `--help` | Show help message and exit |
+
+---
+
+## 🔹 `fetch` — Fetch Market Data
 
 ```
 nse-relative fetch [options]
 ```
 
-### Common options
+### All Options
 
-| Option | Alias | Values | Default | Description |
+| Option | Alias | Type | Default | Description |
 |---|---|---|---|---|
-| `--provider` | `-p` | `nse`, `upstox`, `upstox_options` | `nse` | Data source |
-| `--index` | `-x` | *see list-indices* | `nifty500` | NSE index for symbol sourcing |
-| `--symbols` | `-s` | space-separated symbols | all | Limit to specific symbols |
-| `--start` | `--from` | DD-MM-YYYY | env default | Fetch start date |
-| `--end` | `--to` | DD-MM-YYYY | env / today | Fetch end date |
-| `--interval` | `-i` | `day`, `week`, `month` | provider default | Candle interval |
-| `--force` | `-f` | flag | `False` | Bypass checkpoint, re-fetch all |
-| `--skip-index` | — | flag | `False` | Skip index data (NSE only) |
-
-### F&O-specific options
-
-| Option | Alias | Values | Default | Description |
-|---|---|---|---|---|
-| `--instrument-types` | `-t` | `OPTSTK,OPTIDX` (comma-sep) | `OPTSTK` | F&O contract types |
-| `--include-futures` | — | flag | `False` | Also fetch futures (FUTSTK/FUTIDX) |
-| `--n-expiries` | — | integer (0 = all) | `2` | Upcoming expiry cycles per underlying |
+| `--provider` | `-p` | `nse` / `upstox` / `upstox_options` | `nse` | Data source |
+| `--index` | `-x` | *one of 21 NSE indices* | `nifty500` | NSE index for symbol sourcing |
+| `--symbols` | `-s` | space-separated list | *(all)* | Restrict to specific symbols |
+| `--start` / `--from` | — | `DD-MM-YYYY` | env default | Fetch start date |
+| `--end` / `--to` | — | `DD-MM-YYYY` | env / today | Fetch end date |
+| `--interval` | `-i` | `day` / `week` / `month` | provider default | Candle bar interval |
+| `--instrument-types` | `-t` | comma-sep: `OPTSTK,OPTIDX` | `OPTSTK` | F&O contract types to fetch |
+| `--include-futures` | — | flag | `False` | Also fetch FUTSTK/FUTIDX |
+| `--n-expiries` | — | integer | `2` | Expiry cycles per underlying (`0`=all) |
+| `--force` | `-f` | flag | `False` | Ignore checkpoint, re-fetch all |
+| `--skip-index` | — | flag | `False` | Skip index fetch (NSE only) |
 
 ---
 
-### 📈 NSE Equities
+### 📈 Equities — NSE
+
+Fetch daily OHLCV data from the NSE India public website, plus Nifty 500 index.
 
 ```bash
-# Nifty 50 equities (default date range from .env)
+# Basic — Nifty 50 equities + Nifty 500 index
 nse-relative fetch --provider nse --index nifty50
 
-# All ~750 stocks with custom range
-nse-relative fetch --provider nse --index nifty_total_market \
-  --start 01-01-2020 --end 31-12-2025
+# All ~750 listed stocks
+nse-relative fetch --provider nse --index nifty_total_market
 
-# Specific symbols
-nse-relative fetch --provider nse --symbols RELIANCE TCS HDFCBANK
+# Custom date range (required for data before 2021)
+nse-relative fetch --provider nse --index nifty50 \
+  --start 01-01-2000 --end 01-06-2026
 
-# Force re-fetch (ignore checkpoint)
+# Specific symbols only
+nse-relative fetch --provider nse --symbols RELIANCE TCS HDFCBANK \
+  --start 01-01-2010 --end 01-06-2026
+
+# Equities only — skip index data
+nse-relative fetch --provider nse --index nifty50 --skip-index
+
+# Force re-fetch everything (bypass checkpoint)
 nse-relative fetch --provider nse --force
-
-# Equities only, no index data
-nse-relative fetch --provider nse --skip-index
 ```
 
-### 📈 Upstox Equities
+**Available indices** (21 total):
+`nifty50`, `nifty100`, `nifty200`, `nifty500`, `nifty_total_market`, `nifty_next_50`, `nifty_midcap_50`, `nifty_midcap_150`, `nifty_smallcap_50`, `nifty_smallcap_100`, `nifty_smallcap_250`, `nifty_microcap_250`, `nifty_large_midcap_250`, `nifty_mid_smallcap_400`, `nifty200_momentum_30`, `nifty_midcap150_momentum_50`, `nifty500_momentum_50`, `nifty500_multicap_50_25_25`, `nifty500_large_mid_small_equal`, `nifty_mid_smallcap400_momentum_quality_100`, `nifty_smallcap250_momentum_quality_100`
 
 ```bash
-# Default (Nifty 500, monthly candles)
-nse-relative fetch --provider upstox
-
-# Nifty 200, daily candles from 2020
-nse-relative fetch --provider upstox --interval day \
-  --index nifty200 --start 01-01-2020
-
-# Full history, monthly
-nse-relative fetch --provider upstox --interval month
-
-# Specific tradingsymbols
-nse-relative fetch --provider upstox --symbols RELIANCE TCS HDFCBANK
+# See full list with URLs
+nse-relative list-indices
 ```
 
 ---
 
-### 🎯 Options & Futures (most powerful feature)
+### 📈 Equities — Upstox
 
-#### Stock Options (OPTSTK) — e.g. Nifty 50
+Fetch candle data (day/week/month) for NSE equities via Upstox V2 API.
+Symbols are ISIN-filtered against the chosen NSE index.
 
 ```bash
-# 🔥 Fetch ALL Nifty 50 stock options
-# NEXT 2 expiries per stock, ALL strikes, CE + PE, daily candles
+# Nifty 500 equities (default), monthly candles
+nse-relative fetch --provider upstox
+
+# Nifty 200, daily candles, full history
+nse-relative fetch --provider upstox --interval day --index nifty200 \
+  --start 01-01-2000
+
+# Nifty 50, weekly candles, custom date range
+nse-relative fetch --provider upstox --interval week --index nifty50 \
+  --start 01-01-2010 --end 01-06-2026
+
+# Specific symbols only
+nse-relative fetch --provider upstox --symbols RELIANCE TCS HDFCBANK
+
+# Force re-fetch
+nse-relative fetch --provider upstox --force
+```
+
+---
+
+### 🎯 Options & Futures — Upstox F&O
+
+The most powerful feature. Discovers contracts from the Upstox instrument master, applies expiry filtering, and fetches daily OHLCV+OI candles.
+
+#### How Discovery Works
+
+```
+1. Download Upstox instrument master CSV (~200K rows)
+   └── Filter to exchange="NSE_FO"
+
+2. STOCK OPTIONS (OPTSTK):
+   └── Match NSE index ISINs → find company names
+       └── Filter OPTSTK contracts by those names
+
+3. INDEX OPTIONS (OPTIDX):
+   └── Auto-discovered from instrument master
+       └── All available indices included
+
+4. EXPIRY FILTERING (per underlying):
+   └── Group contracts by underlying stock/index
+       └── Sort by expiry → keep next N unique dates
+           └── ALL strikes × (CE + PE) kept
+```
+
+#### Stock Options — Nifty 50
+
+```bash
+# Nifty 50 stock options — next 2 expiries, all strikes, daily
 nse-relative fetch --provider upstox_options --index nifty50
+
+# Custom date range
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --start 01-01-2024 --end 01-06-2026
+
+# Next 5 expiries per stock
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --n-expiries 5
+
+# All expiries (disable expiry filter)
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --n-expiries 0
+
+# Weekly candle interval
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --interval week
 ```
 
-**How it works:**
-
-```
-Nifty 50 (50 stocks)
-  │
-  ├─ RELIANCE → OPTSTK contracts matched by ISIN
-  │   ├─ Expiry 1 (e.g. Jun 26): strikes 1200–1500, CE+PE  → ~600 contracts
-  │   └─ Expiry 2 (e.g. Jul 30): strikes 1200–1500, CE+PE  → ~600 contracts
-  │
-  ├─ TCS → OPTSTK contracts
-  │   ├─ Expiry 1: strikes 3200–3800, CE+PE
-  │   └─ Expiry 2: strikes 3200–3800, CE+PE
-  │
-  └─ ... (all 50 stocks)
-```
-
-Each contract file (e.g. `TCS26JUN3450CE.parquet`) contains:
-`date, open, high, low, close, vol, oi, symbol, instrument_type, option_type, expiry, strike, lot_size, underlying_name`
-
-**~4,000 contracts total** (50 stocks × 2 expiries × ~20 strikes × 2 types)
-
-#### Index Options (OPTIDX) — All Indices
+#### Index Options
 
 ```bash
-# 🔥 Fetch ALL index options (NIFTY, BANKNIFTY, FINNIFTY, etc.)
+# All index options (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, etc.)
 nse-relative fetch --provider upstox_options --instrument-types OPTIDX
 
-# Combined: stock options + index options
+# Index options with custom date range
+nse-relative fetch --provider upstox_options --instrument-types OPTIDX \
+  --start 01-01-2024 --end 01-06-2026
+
+# Index options, next 3 expiries
+nse-relative fetch --provider upstox_options --instrument-types OPTIDX \
+  --n-expiries 3
+```
+
+#### Combinations
+
+```bash
+# Stock options + Index options
 nse-relative fetch --provider upstox_options --index nifty50 \
   --instrument-types "OPTSTK,OPTIDX"
 
-# Add futures too
+# Stock options + Index options + Futures
 nse-relative fetch --provider upstox_options --index nifty50 \
   --instrument-types "OPTSTK,OPTIDX" --include-futures
+
+# All asset classes, custom range, next 3 expiries
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --instrument-types "OPTSTK,OPTIDX" --include-futures \
+  --start 01-01-2024 --end 01-06-2026 --n-expiries 3
 ```
 
-Available index options (auto-discovered): `BANKNIFTY`, `FINNIFTY`, `MIDCPNIFTY`, `NIFTY`, `NIFTYNXT50`, `SENSEX`, `SENSEX50`, and more.
-
-#### Specific Tradingsymbols
+#### Futures Only
 
 ```bash
-# Fetch specific contracts by tradingsymbol
+# Stock futures + index futures
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --instrument-types "FUTSTK,FUTIDX"
+```
+
+#### Specific Contract Tradingsymbols
+
+```bash
 nse-relative fetch --provider upstox_options \
   --symbols NIFTY26JUN23600CE NIFTY26JUN23600PE RELIANCE26JUN1230CE
 ```
 
-#### Expiry Filtering Control
+#### Force Re-fetch
 
 ```bash
-# Next 3 expiries per underlying (instead of default 2)
-nse-relative fetch --provider upstox_options --n-expiries 3
-
-# ALL expiries (disable expiry filter)
-# Fetches everything in the instrument master (recently expired + upcoming)
-nse-relative fetch --provider upstox_options --n-expiries 0
+nse-relative fetch --provider upstox_options --force
+nse-relative fetch --provider upstox_options --index nifty50 --force
 ```
-
-> **Historical + Current**: When `--n-expiries 2`, only the next 2 upcoming expiries are fetched. Contracts that have already expired are skipped. Use `--n-expiries 0` to fetch ALL contracts in the instrument master (including recently expired ones). For truly historical data (years-old expired contracts), they won't be in the current instrument master CSV.
-
-#### Custom Date Range
-
-```bash
-# Fetch options from a specific date range
-nse-relative fetch --provider upstox_options \
-  --start 01-01-2024 --end 01-06-2026
-```
-
-> ⚠️ The Upstox instrument master CSV contains recently listed contracts. Very old expired contracts may not be discoverable.
 
 ---
 
-## 🔹 List Commands
+## 🔹 `list-providers` — Show Providers
 
 ```bash
-# Show providers with stored instrument counts
 nse-relative list-providers
+```
 
-# Show available NSE index constituent lists
+Output:
+```
+Available providers:
+  - nse
+  - upstox
+  - upstox_options
+```
+
+---
+
+## 🔹 `list-indices` — Show NSE Indices
+
+List all 21 NSE index constituent lists with their approximate sizes.
+
+```bash
 nse-relative list-indices
-
-# Show stored symbols for a provider with date coverage
-nse-relative list-symbols --provider nse
-nse-relative list-symbols --provider upstox
-
-# Show stored F&O contracts
-nse-relative list-symbols --provider upstox --asset-class derivative
-
-# Show stored indices
-nse-relative list-symbols --provider nse --asset-class index
-
-# Show detailed instrument coverage from catalog
-nse-relative list-instruments
 ```
 
----
-
-## 🔹 Migration
-
-```bash
-# Migrate NSE data from old flat format to new structured layout
-nse-relative migrate --provider nse
-
-# Migrate Upstox data
-nse-relative migrate --provider upstox
+Sample output:
+```
+Available NSE index constituent lists:
+  - nifty50
+  - nifty100
+  - nifty200
+  - nifty500
+  - nifty_total_market
+  ...
 ```
 
----
-
-## 🔹 Utility
-
-```bash
-# Show version
-nse-relative --version
-
-# Show help
-nse-relative --help
-nse-relative fetch --help
-```
+> Note: Some indices fetch live from NSE servers — first call may be slow.
 
 ---
 
 ## 🔹 Examples Cheatsheet
 
 ```bash
-# ── Quick fetches ──────────────────────────────────────
+# ═══════════════════════════════════════════════════════════
+# QUICK STARTERS
+# ═══════════════════════════════════════════════════════════
 
 # 1. Nifty 50 equities + index data
 nse-relative fetch -p nse -x nifty50
@@ -220,23 +261,120 @@ nse-relative fetch -p upstox_options -x nifty50
 # 4. All index options (NIFTY, BANKNIFTY, etc.)
 nse-relative fetch -p upstox_options -t OPTIDX
 
-# 5. Everything: stock options + index options + futures
+# 5. Everything: stock opts + index opts + futures
 nse-relative fetch -p upstox_options -x nifty50 \
   -t "OPTSTK,OPTIDX" --include-futures
 
-# ── Advanced ───────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════
+# DATE RANGE EXAMPLES
+# ═══════════════════════════════════════════════════════════
 
-# Nifty 50 options, next 3 expiries
-nse-relative fetch -p upstox_options -x nifty50 --n-expiries 3
+# NSE equities — full history from 2000
+nse-relative fetch -p nse -x nifty50 --start 01-01-2000 --end 01-06-2026
 
-# All contracts (disable expiry filter)
+# Upstox equities — last 5 years
+nse-relative fetch -p upstox -x nifty200 -i month \
+  --start 01-01-2021 --end 01-06-2026
+
+# Options — since listing
+nse-relative fetch -p upstox_options -x nifty50 \
+  --start 01-01-2024 --end 01-06-2026
+
+# Options — just current year
+nse-relative fetch -p upstox_options -t OPTIDX \
+  --start 01-01-2026 --end 01-06-2026
+
+# ═══════════════════════════════════════════════════════════
+# EXPIRY CONTROL
+# ═══════════════════════════════════════════════════════════
+
+# Next 2 expiries (default)
+nse-relative fetch -p upstox_options -x nifty50
+
+# Next 5 expiries
+nse-relative fetch -p upstox_options -x nifty50 --n-expiries 5
+
+# ALL expiries (disable filter)
 nse-relative fetch -p upstox_options -x nifty50 --n-expiries 0
 
-# Force re-fetch everything
+# ═══════════════════════════════════════════════════════════
+# FORCE RE-FETCH
+# ═══════════════════════════════════════════════════════════
+
 nse-relative fetch -p nse --force
 nse-relative fetch -p upstox --force
 nse-relative fetch -p upstox_options --force
 
-# Weekly options candles
-nse-relative fetch -p upstox_options -x nifty50 -i week
+# ═══════════════════════════════════════════════════════════
+# SPECIFIC SYMBOLS
+# ═══════════════════════════════════════════════════════════
+
+# NSE equities
+nse-relative fetch -p nse -s RELIANCE TCS HDFCBANK
+
+# Upstox equities
+nse-relative fetch -p upstox -s RELIANCE TCS HDFCBANK
+
+# F&O contracts by tradingsymbol
+nse-relative fetch -p upstox_options \
+  -s NIFTY26JUN23600CE NIFTY26JUN23600PE
+
+# ═══════════════════════════════════════════════════════════
+# INTERVAL CONTROL (Upstox only)
+# ═══════════════════════════════════════════════════════════
+
+nse-relative fetch -p upstox -i day
+nse-relative fetch -p upstox -i week
+nse-relative fetch -p upstox -i month
+nse-relative fetch -p upstox_options -i day
 ```
+
+---
+
+## ⚠️ Troubleshooting
+
+### `nse-relative: command not found`
+
+The venv isn't activated or the package isn't installed:
+
+```bash
+# Activate venv (Windows)
+venv\Scripts\activate
+
+# Install
+pip install -e .
+```
+
+### `ModuleNotFoundError: No module named 'nse_relative.presentation'`
+
+Stale entry point executable. Reinstall:
+
+```bash
+pip uninstall nse-relative -y
+pip install -e .
+```
+
+Or use the module directly:
+
+```bash
+python -m nse_relative fetch --provider upstox --index nifty50
+```
+
+### Unicode/encoding errors on Windows
+
+If you see `UnicodeEncodeError: 'charmap' codec can't encode character`,
+set your console to UTF-8:
+
+```bash
+chcp 65001
+```
+
+---
+
+## 📖 See Also
+
+- **README.md** — Overview, setup, architecture, data storage
+- **`requirements.txt`** — Runtime dependencies
+- **`requirements-dev.txt`** — Dev dependencies
+- **`.env.example`** — All configurable environment variables
+- **`pyproject.toml`** — Project metadata and dependencies

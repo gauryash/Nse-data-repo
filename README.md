@@ -204,8 +204,6 @@ nse-relative fetch --provider upstox_options --index nifty50 \
 ```
 data/
 │
-├── _catalog.parquet              # Unified metadata (all providers)
-│
 ├── nse/
 │   ├── _checkpoint.json          # Per-symbol fetch tracking
 │   ├── equities_{year}.parquet   # Yearly partitions
@@ -216,7 +214,7 @@ data/
     ├── _checkpoint.json
     ├── {SYMBOL}.parquet          # Per-equity files (RELIANCE.parquet, etc.)
     │
-    └── upstox_options/           # F&O data (written by upstox_options provider)
+    └── upstox_options/           # F&O data
         ├── _checkpoint.json
         ├── _contracts.parquet    # 📋 Contract manifest (expiry-queryable)
         ├── NIFTY26JUN23600CE.parquet
@@ -365,6 +363,36 @@ Copy `.env.example` → `.env` and adjust as needed:
 
 ---
 
+## 🔧 Troubleshooting
+
+### `ModuleNotFoundError: No module named 'nse_relative.presentation'`
+
+The entry point script is stale. Reinstall the package:
+
+```bash
+pip uninstall nse-relative -y
+pip install -e .
+```
+
+### Entry point still fails after reinstall
+
+Use the module directly as a fallback — this always picks up the latest code:
+
+```bash
+python -m nse_relative fetch --provider upstox --index nifty50
+```
+
+### Unicode/encoding errors on Windows
+
+The pipeline uses plain ASCII in log messages (`->` instead of `→`, `..` instead of `…`).
+If you still see encoding errors, set your console to UTF-8:
+
+```bash
+chcp 65001
+```
+
+---
+
 ## 🔧 Development
 
 ```bash
@@ -391,6 +419,8 @@ nse-relative fetch --help
 ## 📖 Further Reading
 
 - **[docs/commands.md](docs/commands.md)** — Full command reference with examples
+- **`requirements.txt`** — Runtime dependencies (install with `pip install -r requirements.txt`)
+- **`requirements-dev.txt`** — Dev dependencies (includes linting, testing)
 - **`.env.example`** — All configurable environment variables
 - **`pyproject.toml`** — Project metadata and dependencies
 

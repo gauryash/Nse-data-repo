@@ -50,7 +50,7 @@ Repository = "https://github.com/yourusername/nse-relative.git"
 Issues = "https://github.com/yourusername/nse-relative/issues"
 
 [project.scripts]
-nse-relative = "nse_relative.presentation.cli:main"
+nse-relative = "nse_relative.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nse_relative"]

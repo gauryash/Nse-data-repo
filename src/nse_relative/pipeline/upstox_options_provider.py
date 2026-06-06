@@ -184,9 +184,12 @@ class UpstoxOptionsProvider(DataProvider):
             )
             return
 
+        # Ensure unique integer index to avoid .loc[i] returning a DataFrame
+        symboldf = symboldf.reset_index(drop=True)
+
         logger.info(
             "UpstoxOptions: %d contracts, interval=%s, types=%s, "
-            "n_expiries=%s, range=[%s … %s], force=%s",
+            "n_expiries=%s, range=[%s .. %s], force=%s",
             len(symboldf), self._interval, self._instrument_types,
             effective_n if symbols is None else "ALL",
             self._start.strftime("%Y-%m-%d"),
@@ -274,7 +277,7 @@ class UpstoxOptionsProvider(DataProvider):
         if df is not None and not df.empty:
             df["symbol"] = symbol
             logger.info(
-                "%s: %d rows [%s … %s]",
+                "%s: %d rows [%s .. %s]",
                 symbol, len(df),
                 df["date"].min().strftime("%Y-%m-%d"),
                 df["date"].max().strftime("%Y-%m-%d"),
@@ -289,20 +292,28 @@ class UpstoxOptionsProvider(DataProvider):
     @staticmethod
     def _attach_metadata(df: pd.DataFrame, row: pd.Series) -> pd.DataFrame:
         """Add contract metadata columns to the candle DataFrame."""
-        df["instrument_type"] = row.get("instrument_type", "")
-        df["option_type"] = row.get("option_type", "")
-        df["expiry"] = (
-            pd.to_datetime(row["expiry"]).date()
-            if pd.notna(row.get("expiry"))
-            else None
-        )
+        df = df.copy()
+        df["instrument_type"] = str(row.get("instrument_type", ""))
+        df["option_type"] = str(row.get("option_type", ""))
+
+        # Expiry: safely convert to string for parquet compatibility
+        raw_expiry = row.get("expiry")
+        if pd.notna(raw_expiry):
+            try:
+                expiry_str = str(pd.to_datetime(raw_expiry).date())
+            except Exception:
+                expiry_str = str(raw_expiry)
+        else:
+            expiry_str = ""
+        df["expiry"] = expiry_str
+
         df["strike"] = (
-            float(row["strike"]) if pd.notna(row.get("strike")) else None
+            float(row["strike"]) if pd.notna(row.get("strike")) else 0.0
         )
         df["lot_size"] = (
-            int(row["lot_size"]) if pd.notna(row.get("lot_size")) else None
+            int(row["lot_size"]) if pd.notna(row.get("lot_size")) else 0
         )
-        df["underlying_name"] = row.get("name", "")
+        df["underlying_name"] = str(row.get("name", ""))
         return df
 
     # ------------------------------------------------------------------

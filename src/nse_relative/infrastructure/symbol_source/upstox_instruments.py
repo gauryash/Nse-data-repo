@@ -313,7 +313,7 @@ def filter_by_expiry(
     result.reset_index(drop=True, inplace=True)
 
     logger.info(
-        "Expiry filter: %d → %d contracts (next %d expiry(ies) per %d underlyings)",
+        "Expiry filter: %d -> %d contracts (next %d expiry(ies) per %d underlyings)",
         len(contracts_df), len(result), n_expiries, result[group_by_col].nunique(),
     )
     return result

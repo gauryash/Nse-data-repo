@@ -132,7 +132,7 @@ class UpstoxClient:
             return df
         except Exception as e:
             logger.warning(
-                "%s | %s → %s | %s",
+                "%s | %s -> %s | %s",
                 instrument_key,
                 self._fmt_date(chunk_start),
                 self._fmt_date(chunk_end),

@@ -9,6 +9,7 @@ index charts.
 from __future__ import annotations
 
 import time
+import urllib.parse
 from datetime import datetime
 from typing import Any, Optional
 
@@ -29,6 +30,10 @@ class NseClient:
 
     Encapsulates session management, retry logic, and rate limiting so
     that providers don't need to deal with HTTP details.
+
+    The NSE warmup/referrer domain is derived from *base_url* so there
+    is no hardcoded ``nseindia.com`` — if NSE changes their domain,
+    only ``settings.nse_base_url`` needs to be updated.
     """
 
     def __init__(
@@ -47,8 +52,15 @@ class NseClient:
     # Session management
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _create_session() -> requests.Session:
+    def _nse_domain(self) -> str:
+        """Extract scheme + netloc from the configured base URL.
+
+        E.g. ``https://www.nseindia.com/api/...`` → ``https://www.nseindia.com``
+        """
+        parsed = urllib.parse.urlparse(self._base_url)
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    def _create_session(self) -> requests.Session:
         """Create a session with browser-like headers."""
         s = requests.Session()
         s.headers.update({
@@ -59,7 +71,7 @@ class NseClient:
             ),
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.nseindia.com/",
+            "Referer": f"{self._nse_domain()}/",
         })
         return s
 
@@ -92,8 +104,8 @@ class NseClient:
         s = self._create_session()
         for attempt in range(self._max_retries):
             try:
-                # Warm-up request to get cookies
-                s.get("https://www.nseindia.com", timeout=10)
+                # Warm-up request to get cookies (domain derived from settings)
+                s.get(self._nse_domain(), timeout=10)
                 r = s.get(url, timeout=10)
                 if r.status_code == 200:
                     self._rate_limiter.success(symbol)
@@ -130,7 +142,7 @@ class NseClient:
             List of ``[timestamp_ms, close_price]`` arrays, or empty list.
         """
         s = self._create_session()
-        s.get("https://www.nseindia.com", timeout=10)
+        s.get(self._nse_domain(), timeout=10)
         for attempt in range(self._max_retries):
             try:
                 r = s.get(

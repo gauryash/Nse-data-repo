@@ -20,40 +20,52 @@ from typing import Optional
 import pandas as pd
 import requests
 
+from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
 
 logger = get_logger(__name__)
 
+# ---------------------------------------------------------------------------
+# Index CSV filenames keyed by index name.
+#
+# URLs are constructed dynamically from configurable base URLs in settings
+# so that if NSE changes their CDN domain only an env var needs updating.
+# ---------------------------------------------------------------------------
+
+# Indices hosted on nsearchives.nseindia.com
+_NSEARCHIVES = "nse_index_csv_base"
+
+# Indices hosted on niftyindices.com
+_NIFTYINDICES = "niftyindices_base"
+
+_NSE_INDEX_FILES: dict[str, tuple[str, str]] = {
+    # (config_field, filename)
+    "nifty50": (_NSEARCHIVES, "ind_nifty50list.csv"),
+    "nifty100": (_NSEARCHIVES, "ind_nifty100list.csv"),
+    "nifty200": (_NSEARCHIVES, "ind_nifty200list.csv"),
+    "nifty500": (_NSEARCHIVES, "ind_nifty500list.csv"),
+    "nifty_total_market": (_NSEARCHIVES, "ind_niftytotalmarket_list.csv"),
+    "nifty_next_50": (_NSEARCHIVES, "ind_niftynext50list.csv"),
+    "nifty500_multicap_50_25_25": (_NSEARCHIVES, "ind_nifty500Multicap502525_list.csv"),
+    "nifty500_large_mid_small_equal": (_NIFTYINDICES, "ind_nifty500LargeMidSmallEqualCapWeighted_list.csv"),
+    "nifty_midcap_50": (_NSEARCHIVES, "ind_niftymidcap50list.csv"),
+    "nifty_midcap_150": (_NSEARCHIVES, "ind_niftymidcap150list.csv"),
+    "nifty_smallcap_50": (_NSEARCHIVES, "ind_niftysmallcap50list.csv"),
+    "nifty_smallcap_100": (_NSEARCHIVES, "ind_niftysmallcap100list.csv"),
+    "nifty_smallcap_250": (_NSEARCHIVES, "ind_niftysmallcap250list.csv"),
+    "nifty_microcap_250": (_NSEARCHIVES, "ind_niftymicrocap250_list.csv"),
+    "nifty_large_midcap_250": (_NSEARCHIVES, "ind_niftylargemidcap250list.csv"),
+    "nifty_mid_smallcap_400": (_NSEARCHIVES, "ind_niftymidsmallcap400list.csv"),
+    "nifty200_momentum_30": (_NIFTYINDICES, "ind_nifty200Momentum30_list.csv"),
+    "nifty_midcap150_momentum_50": (_NIFTYINDICES, "ind_niftymidcap150momentum50_list.csv"),
+    "nifty500_momentum_50": (_NIFTYINDICES, "ind_nifty500Momentum50_list.csv"),
+    "nifty_mid_smallcap400_momentum_quality_100": (_NIFTYINDICES, "ind_niftyMidSmallcap400MomentumQuality100_list.csv"),
+    "nifty_smallcap250_momentum_quality_100": (_NIFTYINDICES, "ind_niftySmallcap250MomentumQuality100_list.csv"),
+}
+
 NSE_INDEX_URLS: dict[str, str] = {
-    # Broad market
-    "nifty50": "https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv",
-    "nifty100": "https://nsearchives.nseindia.com/content/indices/ind_nifty100list.csv",
-    "nifty200": "https://nsearchives.nseindia.com/content/indices/ind_nifty200list.csv",
-    "nifty500": "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv",
-    "nifty_total_market": "https://nsearchives.nseindia.com/content/indices/ind_niftytotalmarket_list.csv",
-    # Next 50
-    "nifty_next_50": "https://nsearchives.nseindia.com/content/indices/ind_niftynext50list.csv",
-    # Multi-cap
-    "nifty500_multicap_50_25_25": "https://nsearchives.nseindia.com/content/indices/ind_nifty500Multicap502525_list.csv",
-    "nifty500_large_mid_small_equal": "https://niftyindices.com/IndexConstituent/ind_nifty500LargeMidSmallEqualCapWeighted_list.csv",
-    # Mid-cap
-    "nifty_midcap_50": "https://nsearchives.nseindia.com/content/indices/ind_niftymidcap50list.csv",
-    "nifty_midcap_150": "https://nsearchives.nseindia.com/content/indices/ind_niftymidcap150list.csv",
-    # Small-cap
-    "nifty_smallcap_50": "https://nsearchives.nseindia.com/content/indices/ind_niftysmallcap50list.csv",
-    "nifty_smallcap_100": "https://nsearchives.nseindia.com/content/indices/ind_niftysmallcap100list.csv",
-    "nifty_smallcap_250": "https://nsearchives.nseindia.com/content/indices/ind_niftysmallcap250list.csv",
-    # Micro-cap
-    "nifty_microcap_250": "https://nsearchives.nseindia.com/content/indices/ind_niftymicrocap250_list.csv",
-    # Large+Mid / Mid+Small
-    "nifty_large_midcap_250": "https://nsearchives.nseindia.com/content/indices/ind_niftylargemidcap250list.csv",
-    "nifty_mid_smallcap_400": "https://nsearchives.nseindia.com/content/indices/ind_niftymidsmallcap400list.csv",
-    # Momentum / Quality factor indices
-    "nifty200_momentum_30": "https://www.niftyindices.com/IndexConstituent/ind_nifty200Momentum30_list.csv",
-    "nifty_midcap150_momentum_50": "https://www.niftyindices.com/IndexConstituent/ind_niftymidcap150momentum50_list.csv",
-    "nifty500_momentum_50": "https://www.niftyindices.com/IndexConstituent/ind_nifty500Momentum50_list.csv",
-    "nifty_mid_smallcap400_momentum_quality_100": "https://www.niftyindices.com/IndexConstituent/ind_niftyMidSmallcap400MomentumQuality100_list.csv",
-    "nifty_smallcap250_momentum_quality_100": "https://www.niftyindices.com/IndexConstituent/ind_niftySmallcap250MomentumQuality100_list.csv",
+    name: f"{getattr(settings, base)}/{file}"
+    for name, (base, file) in _NSE_INDEX_FILES.items()
 }
 
 DEFAULT_NSE_INDEX = "nifty500"

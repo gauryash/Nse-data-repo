@@ -91,6 +91,8 @@ class Settings:
     # --- NSE API ---
     nse_base_url: str = "https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi"
     nse_index_url: str = "https://www.nseindia.com/api/NextApi/apiClient/historicalGraph"
+    nse_index_csv_base: str = "https://nsearchives.nseindia.com/content/indices"
+    niftyindices_base: str = "https://www.niftyindices.com/IndexConstituent"
     nse_benchmark: str = "NIFTY 500"
     nse_fetch_start: str = "01-01-2021"
     nse_fetch_end: str = ""  # empty = today at runtime
@@ -147,6 +149,14 @@ class Settings:
         All env vars are optional — missing vars fall back to defaults.
         """
         return cls(
+            nse_index_csv_base=os.getenv(
+                "NSE_INDEX_CSV_BASE",
+                "https://nsearchives.nseindia.com/content/indices",
+            ),
+            niftyindices_base=os.getenv(
+                "NIFTYINDICES_BASE",
+                "https://www.niftyindices.com/IndexConstituent",
+            ),
             nse_fetch_start=os.getenv("NSE_FETCH_START", "01-01-2021"),
             nse_fetch_end=os.getenv("NSE_FETCH_END", ""),
             nse_fetch_chunk_days=int(os.getenv("NSE_FETCH_CHUNK_DAYS", "110")),

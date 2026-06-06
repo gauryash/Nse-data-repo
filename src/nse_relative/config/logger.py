@@ -2,24 +2,36 @@
 import logging
 import sys
 
-from nse_relative.config.settings import LOG_LEVEL
+_LOG_CONFIGURED = False
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Return a logger configured with a standard format."""
+    """Return a logger configured with a standard format.
+
+    The first call sets the level from ``NSE_LOG_LEVEL`` (default ``INFO``).
+    Subsequent calls reuse the same config.
+    """
+    global _LOG_CONFIGURED
+
     logger = logging.getLogger(name)
 
     if logger.handlers:
         return logger
 
-    logger.setLevel(LOG_LEVEL)
+    if not _LOG_CONFIGURED:
+        _LOG_CONFIGURED = True
+        # Set level on the root once
+        from nse_relative.config.settings import settings
+
+        logging.getLogger().setLevel(settings.log_level)
 
     handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(LOG_LEVEL)
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
     logger.addHandler(handler)
 
     return logger

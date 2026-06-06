@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nse-relative"
-version = "0.2.0"
-description = "NSE / Upstox data pipeline + Relative Strength + Anchored VWAP + Telegram scanners"
+version = "0.3.0"
+description = "NSE / Upstox data pipeline — fetch equities, index, and F&O data"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -22,7 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Office/Business :: Financial :: Investment",
 ]
-keywords = ["nse", "upstox", "india", "stock-market", "relative-strength", "vwap", "finance"]
+keywords = ["nse", "upstox", "india", "stock-market", "data-pipeline", "finance"]
 
 dependencies = [
     "pandas>=2.0",
@@ -32,9 +32,6 @@ dependencies = [
     "openpyxl>=3.1",
     "pyarrow>=14.0",
     "pytz>=2024.1",
-    "beautifulsoup4>=4.12",
-    "lxml>=5.0",
-    "html5lib>=1.1",
 ]
 
 [project.optional-dependencies]
@@ -51,10 +48,9 @@ dev = [
 Homepage = "https://github.com/yourusername/nse-relative"
 Repository = "https://github.com/yourusername/nse-relative.git"
 Issues = "https://github.com/yourusername/nse-relative/issues"
-Changelog = "https://github.com/yourusername/nse-relative/blob/main/CHANGELOG.md"
 
 [project.scripts]
-nse-relative = "nse_relative.cli:main"
+nse-relative = "nse_relative.presentation.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nse_relative"]
@@ -68,12 +64,6 @@ select = ["E", "F", "UP", "B", "SIM", "I", "ARG", "RUF"]
 
 [tool.ruff.format]
 quote-style = "double"
-
-[tool.mypy]
-python_version = "3.10"
-strict = true
-ignore_missing_imports = true
-exclude = ["tests/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

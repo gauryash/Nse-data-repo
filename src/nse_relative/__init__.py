@@ -1,9 +1,11 @@
-"""NSE Relative Strength Analyzer — revamped architecture.
+"""NSE / Upstox data pipeline — fetch equities, index, and F&O data.
 
-Three layers:
-  pipeline  – data fetching from NSE / Upstox APIs
-  analytics – compute RS, anchored VWAP, etc.
-  scanners  – external screener APIs → Telegram notifications
+Two data sources:
+  - NSE India public website API (equities + index)
+  - Upstox API (equities + F&O options/futures)
+
+Storage is provider-partitioned under ``data/`` with per-symbol checkpoint
+tracking for incremental fetching.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

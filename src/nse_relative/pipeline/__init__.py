@@ -1,4 +1,4 @@
-"""Pipeline: data providers, storage, rate limiting, symbol management."""
+"""Pipeline: data providers for NSE, Upstox (equities), and Upstox (F&O)."""
 
 from nse_relative.pipeline.nse_provider import NSEProvider
 from nse_relative.pipeline.upstox_provider import UpstoxProvider

@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling>=1.21.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nse-relative"
+version = "0.2.0"
+description = "NSE / Upstox data pipeline + Relative Strength + Anchored VWAP + Telegram scanners"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Yash", email = "yash@example.com" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+keywords = ["nse", "upstox", "india", "stock-market", "relative-strength", "vwap", "finance"]
+
+dependencies = [
+    "pandas>=2.0",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "numpy>=1.24",
+    "openpyxl>=3.1",
+    "pyarrow>=14.0",
+    "pytz>=2024.1",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "html5lib>=1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov>=4",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pandas-stubs>=2",
+    "pre-commit>=3",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/nse-relative"
+Repository = "https://github.com/yourusername/nse-relative.git"
+Issues = "https://github.com/yourusername/nse-relative/issues"
+Changelog = "https://github.com/yourusername/nse-relative/blob/main/CHANGELOG.md"
+
+[project.scripts]
+nse-relative = "nse_relative.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nse_relative"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "B", "SIM", "I", "ARG", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+exclude = ["tests/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: marks tests that make live API calls (slow)",
+]

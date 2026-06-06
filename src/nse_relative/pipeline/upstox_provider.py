@@ -18,7 +18,7 @@ import pandas as pd
 from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
 from nse_relative.pipeline.base import DataProvider
-from nse_relative.infrastructure.api.upstox_client import UpstoxClient
+from nse_relative.infrastructure.api.upstox_client import UpstoxClient, TIME_ZONE as UPSTOX_TIME_ZONE
 from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
 from nse_relative.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
 from nse_relative.infrastructure.symbol_source import upstox_instruments as upstox_src
@@ -68,7 +68,7 @@ class UpstoxProvider(DataProvider):
         self._end = (
             self._client.parse_date(end_date)
             if end_date
-            else datetime.now(UpstoxClient.TIME_ZONE)
+            else datetime.now(UPSTOX_TIME_ZONE)
         )
         if self._end < self._start:
             raise ValueError(

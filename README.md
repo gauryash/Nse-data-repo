@@ -1,8 +1,8 @@
 <div align="center">
 
-# 📊 NSE / Upstox Data Pipeline
+# 📈 NSE / Upstox Data Pipeline
 
-**Multi-source data pipeline for Indian financial market data — equities, options & futures**
+**Multi-source pipeline for Indian financial market data — Equities, Options & Futures**
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -12,35 +12,42 @@
 
 ---
 
-## 🔥 What it does
+## 🔥 Overview
 
-Fetches historical market data from **two sources** and stores it in a clean, queryable format:
+Fetches historical market data from **two sources** and stores it in Parquet format for analysis.
 
-| Source | Equities | Options (OPTSTK) | Index Options (OPTIDX) | Futures | Index |
+| Source | Equities | Stock Options (OPTSTK) | Index Options (OPTIDX) | Futures | Index |
 |---|---|---|---|---|---|
-| **NSE India** (public API) | ✅ Daily OHLCV | ❌ | ❌ | ❌ | ✅ Nifty 500 |
-| **Upstox** (V2 API) | ✅ Day/Week/Month | ✅ | ✅ | ✅ | ❌ |
+| **NSE India** (website API) | ✅ Daily OHLCV | ❌ | ❌ | ❌ | ✅ Nifty 500 |
+| **Upstox** (V2 API) | ✅ Day/Week/Month | ✅ All strikes × expiries | ✅ NIFTY, BANKNIFTY, etc. | ✅ FUTSTK/FUTIDX | ❌ |
 
-Key features:
-- **Incremental fetch** — checkpoint system skips already-downloaded date ranges
-- **Per-symbol tracking** — knows exact date coverage for every instrument
-- **Contract manifest** — expiry-queryable catalog of all F&O contracts
-- **Expiry-aware filtering** — fetch only the next N expiries per underlying
-- **Parallel fetching** — ThreadPoolExecutor for concurrent downloads
-- **Rate limiting** — exponential backoff for HTTP 429 responses
-- **Unified metadata catalog** — single registry of all downloaded instruments
+Key capabilities:
+- **NSE Equity data** — 20+ index constituent lists (Nifty 50, 500, etc.)
+- **Upstox Equity data** — ISIN-filtered against any NSE index
+- **Options chain** — Full strike/expiry discovery for stock + index options
+- **Expiry-aware filtering** — Per-underlying, keeps next N expiries (all strikes)
+- **Incremental fetch** — Per-symbol checkpoint avoids re-downloads
+- **Contract manifest** — `_contracts.parquet` enables expiry-based queries
+- **Parallel downloads** — ThreadPoolExecutor with rate limiting
+
+> 📖 **Detailed command reference**: [docs/commands.md](docs/commands.md)
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Setup
 
-### 1. Clone & setup
+### Prerequisites
+- Python 3.10+
+- Git
+
+### Installation
 
 ```bash
+# Clone
 git clone <your-repo-url>
 cd nse-data-repo
 
-# Create virtual environment (Python 3.10+)
+# Create virtual environment
 python -m venv venv
 
 # Activate (Windows)
@@ -48,379 +55,347 @@ venv\Scripts\activate
 
 # Activate (macOS/Linux)
 # source venv/bin/activate
-```
 
-### 2. Install
-
-```bash
-# Development install with all dependencies
+# Install
 pip install -e ".[dev]"
-
-# Or from requirements.txt
-pip install -r requirements.txt
 ```
 
-### 3. Configure
-
-Copy the environment template and adjust if needed:
+### Configuration (optional)
 
 ```bash
 cp .env.example .env
-# Edit .env to set fetch dates or other options
 ```
 
-The defaults work out of the box for fetching — no API keys required for NSE or Upstox data.
+All defaults work out of the box — no API keys required. The `.env` file lets you override fetch date ranges, intervals, and logging level.
 
-### 4. Fetch data
+---
+
+## 📊 Quick Start
 
 ```bash
-# Fetch NSE equity data + Nifty 500 index (Nifty 50 constituents)
+# ── Equities ──────────────────────────────────────────
+
+# Fetch Nifty 50 equities + Nifty 500 index
 nse-relative fetch --provider nse --index nifty50
 
-# Fetch Upstox equity data (monthly candles, Nifty 200 universe)
+# Fetch Upstox equity data (Nifty 200, monthly candles)
 nse-relative fetch --provider upstox --index nifty200 --interval month
 
-# Fetch F&O options (stock options for Nifty 50, next 2 expiries)
+# ── Options & Futures ─────────────────────────────────
+
+# Stock options for Nifty 50 (next 2 expiries, all strikes, daily)
 nse-relative fetch --provider upstox_options --index nifty50
 
-# Fetch index options + stock options + futures
+# Index options (NIFTY, BANKNIFTY, FINNIFTY, etc.)
+nse-relative fetch --provider upstox_options --instrument-types OPTIDX
+
+# Everything: stock options + index options + futures
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --instrument-types "OPTSTK,OPTIDX" --include-futures
+```
+
+---
+
+## 🎯 Options & Futures — Deep Dive
+
+This is the most powerful feature. Here's exactly how it works.
+
+### How contract discovery works
+
+```
+1. Upstox instrument master CSV (~200K rows) is downloaded
+   └── Filtered to exchange="NSE_FO"
+
+2. For STOCK OPTIONS (OPTSTK):
+   └── Nifty 50 ISINs are matched against Upstox NSE_EQ instruments
+       └── Company names extracted → used to filter OPTSTK contracts
+
+3. For INDEX OPTIONS (OPTIDX):
+   └── Auto-discovered from the instrument master's OPTIDX section
+       └── All available indices included (or restricted via config)
+
+4. Expiry filtering (per underlying, not global):
+   └── Contracts grouped by underlying stock/index
+       └── Sorted by expiry date → keep only next N unique dates
+           └── ALL strikes × (CE + PE) kept for those dates
+```
+
+### What you get per contract
+
+Each file (e.g. `RELIANCE26JUN1230CE.parquet`) contains:
+
+| Column | Example | Description |
+|---|---|---|
+| `date` | `2026-05-12` | Trading date (IST) |
+| `open/high/low/close` | `52.30` | OHLC prices |
+| `vol` | `2,340` | Traded quantity (contracts) |
+| `oi` | `1,365` | Open Interest |
+| `symbol` | `RELIANCE26JUN1230CE` | Tradingsymbol |
+| `instrument_type` | `OPTSTK` | OPTSTK / OPTIDX / FUTSTK / FUTIDX |
+| `option_type` | `CE` | CE / PE / FF |
+| `expiry` | `2026-06-26` | Contract expiry date |
+| `strike` | `1230.0` | Strike price |
+| `lot_size` | `100` | Lot multiplier |
+| `underlying_name` | `RELIANCE` | Company or index name |
+
+### Expiry filter — how it works
+
+```
+Per-underlying grouping (not a global expiry cutoff):
+
+NIFTY (index, weekly expiry):
+  ├── Expiry 1: Jun 09 (all strikes × CE/PE)
+  └── Expiry 2: Jun 16 (all strikes × CE/PE)
+
+RELIANCE (stock, monthly expiry):
+  ├── Expiry 1: Jun 26 (all strikes × CE/PE)
+  └── Expiry 2: Jul 30 (all strikes × CE/PE)
+```
+
+### Historical vs current data
+
+| Option | Behavior | Use case |
+|---|---|---|
+| `--n-expiries 2` (default) | Fetches only **next 2 upcoming** expiries per underlying | Current trading, active contracts |
+| `--n-expiries 0` | Disables filter — fetches **ALL** discoverable contracts | Full historical archive (includes recently expired) |
+| `--n-expiries 5` | Keeps next 5 expiries per underlying | Wider coverage |
+
+> ⚠️ The Upstox instrument master CSV only contains **currently listed + recently expired** contracts. Very old expired contracts may not be discoverable. For deep historical options data, use `--n-expiries 0` to get everything available.
+
+### Available index options
+
+Auto-discovered indices (check list by running the fetcher):
+`BANKNIFTY`, `FINNIFTY`, `MIDCPNIFTY`, `NIFTY`, `NIFTYNXT50`, `SENSEX`, `SENSEX50`, and more.
+
+### Examples
+
+```bash
+# Stock options for Nifty 50 constituents (default: 2 expiries)
+nse-relative fetch --provider upstox_options --index nifty50
+
+# Index options ONLY
+nse-relative fetch --provider upstox_options --instrument-types OPTIDX
+
+# Combined: stock + index options + futures
 nse-relative fetch --provider upstox_options --index nifty50 \
   --instrument-types "OPTSTK,OPTIDX" --include-futures
 
-# Force re-fetch everything (bypass checkpoint)
-nse-relative fetch --provider nse --force
-```
+# All expiries (disable expiry filter)
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --n-expiries 0
 
-### 5. Explore stored data
+# Next 3 expiries per underlying
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --n-expiries 3
 
-```bash
-nse-relative list-providers         # Show providers + stored counts
-nse-relative list-indices           # List all NSE index constituent lists
-nse-relative list-symbols           # List stored equity symbols with coverage
-nse-relative list-symbols --asset-class derivative   # List stored F&O contracts
-```
-
----
-
-## 📋 CLI Reference
-
-### `nse-relative fetch`
-
-| Option | Description | Default |
-|---|---|---|
-| `--provider, -p` | Data source: `nse`, `upstox`, `upstox_options` | `nse` |
-| `--index, -x` | NSE index constituent list (e.g. `nifty50`, `nifty500`) | `nifty500` |
-| `--symbols, -s` | Limit to specific symbols / tradingsymbols | all |
-| `--start` / `--from` | Start date `DD-MM-YYYY` | env default |
-| `--end` / `--to` | End date `DD-MM-YYYY` | env or today |
-| `--interval, -i` | Candle interval: `day`, `week`, `month` | provider default |
-| `--force, -f` | Ignore checkpoint, re-fetch all | `False` |
-| `--skip-index` | Skip Nifty 500 index fetch (NSE only) | `False` |
-| **F&O specific:** | | |
-| `--instrument-types, -t` | Comma-separated: `OPTSTK`, `OPTIDX` | `OPTSTK` |
-| `--include-futures` | Also fetch `FUTSTK` / `FUTIDX` | `False` |
-| `--n-expiries` | Upcoming expiry cycles per underlying (`0` = all) | `2` |
-
-#### Examples
-
-```bash
-# NSE — all ~750 stocks (nifty_total_market)
-nse-relative fetch --provider nse --index nifty_total_market
-
-# NSE — specific symbols
-nse-relative fetch --provider nse --symbols RELIANCE TCS HDFCBANK
-
-# Upstox — daily candles for Nifty 200 from 2020
-nse-relative fetch --provider upstox --interval day --index nifty200 --start 01-01-2020
-
-# Upstox — monthly candles, full history
-nse-relative fetch --provider upstox --interval month --index nifty500
-
-# F&O — index options only (all available indices)
-nse-relative fetch --provider upstox_options --instrument-types OPTIDX
-
-# F&O — next 3 expiries per underlying
-nse-relative fetch --provider upstox_options --n-expiries 3
-
-# F&O — specific tradingsymbols
+# Specific contract tradingsymbols
 nse-relative fetch --provider upstox_options \
   --symbols NIFTY26JUN23600CE NIFTY26JUN23600PE
-```
 
-### List commands
-
-```bash
-nse-relative list-providers        # Show providers + stored instrument counts
-nse-relative list-asset-classes    # Show asset classes with data
-nse-relative list-indices          # Show all 20+ NSE index constituent lists
-nse-relative list-instruments      # Show detailed coverage from catalog
-nse-relative list-symbols          # List stored symbols with date ranges
-nse-relative list-symbols -a derivative   # List stored F&O contracts
-nse-relative --version             # Show version
-```
-
-### Migration (from old flat format)
-
-```bash
-# Migrate NSE data from old flat-file format to new structured layout
-nse-relative migrate --provider nse
-
-# Migrate Upstox data
-nse-relative migrate --provider upstox
+# Weekly candle interval
+nse-relative fetch --provider upstox_options --index nifty50 \
+  --interval week
 ```
 
 ---
 
-## 📂 Data Storage Layout
-
-The pipeline uses a **provider-partitioned, asset-class-aware** storage scheme:
+## 📂 Data Storage
 
 ```
 data/
-├── _catalog.parquet              # 🔄 Unified metadata registry (all providers)
+│
+├── _catalog.parquet              # Unified metadata (all providers)
 │
 ├── nse/
 │   ├── _checkpoint.json          # Per-symbol fetch tracking
-│   ├── equities/
-│   │   ├── RELIANCE.parquet      # One file per symbol
-│   │   ├── TCS.parquet
-│   │   └── ...
-│   └── indices/
-│       └── NIFTY 500.parquet     # Benchmark index data
+│   ├── equities_{year}.parquet   # Yearly partitions
+│   ├── equities.parquet          # Consolidated all years
+│   └── indices.parquet           # Nifty 500 benchmark
 │
 └── upstox/
     ├── _checkpoint.json
-    ├── equities/
-    │   ├── RELIANCE.parquet
-    │   ├── TCS.parquet
-    │   └── ...
-    └── derivatives/
+    ├── {SYMBOL}.parquet          # Per-equity files (RELIANCE.parquet, etc.)
+    │
+    └── upstox_options/           # F&O data (written by upstox_options provider)
+        ├── _checkpoint.json
         ├── _contracts.parquet    # 📋 Contract manifest (expiry-queryable)
-        ├── NIFTY26JUN23600CE.parquet  # Per-contract files
+        ├── NIFTY26JUN23600CE.parquet
         ├── NIFTY26JUN23600PE.parquet
         └── ...
 ```
 
-### Contract manifest
-
-The `_contracts.parquet` file acts as a queryable catalog — enables O(1) expiry-based lookups without scanning individual files:
+### Querying the contract manifest
 
 ```python
-from nse_relative.infrastructure.repositories import DerivativeRepository
-from nse_relative.config.settings import UPSTOX_STORAGE_DIR
+from nse_relative.infrastructure.storage.manifest import ContractManifest
+from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
 
-repo = DerivativeRepository("upstox", UPSTOX_STORAGE_DIR)
+storage = FileStorageRepository()
+manifest = ContractManifest(storage, "upstox_options")
 
 # All NIFTY contracts
-nifty_contracts = repo.query_manifest(underlying_name="NIFTY")
+nifty = manifest.query(underlying_name="NIFTY")
 
-# All CE contracts expiring on a specific date
-calls = repo.query_manifest(expiry="2026-06-09", option_type="CE")
-```
-
-### Checkpoint tracking
-
-Each provider's `_checkpoint.json` tracks per-symbol coverage:
-
-```json
-{
-  "version": 2,
-  "last_updated": "2026-06-06T12:00:00",
-  "asset_classes": {
-    "equity": {
-      "nifty50": {
-        "RELIANCE": {
-          "date_min": "2000-01-07",
-          "date_max": "2026-06-05",
-          "rows": 6134
-        }
-      }
-    }
-  }
-}
+# All CE contracts for a specific expiry
+calls = manifest.query(expiry="2026-06-09", option_type="CE")
 ```
 
 ---
 
-## 🏗️ Architecture
-
-The codebase follows a **clean architecture** pattern with four layers:
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                     PRESENTATION LAYER                        │
-│                   cli.py — Thin CLI dispatch                  │
-├──────────────────────────────────────────────────────────────┤
-│                     APPLICATION LAYER                         │
-│    FetchOrchestrator        InstrumentService                │
-│    (coordinates fetching)   (queries coverage)               │
-├──────────────────────────────────────────────────────────────┤
-│                    INFRASTRUCTURE LAYER                       │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐   │
-│  │  Providers    │  │ Repositories │  │  Persistence       │   │
-│  │  NSEProvider  │  │  EquityRepo  │  │  CheckpointStore   │   │
-│  │  UpstoxProv.  │  │  DerivRepo   │  │  MetadataCatalog   │   │
-│  │               │  │  IndexRepo   │  │  Serializers       │   │
-│  └──────────────┘  └──────────────┘  └───────────────────┘   │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐    │
-│  │  API Layer                                            │    │
-│  │  SymbolRegistry (NSE indices + Upstox instruments)    │    │
-│  │  RateLimiter  (exponential backoff)                   │    │
-│  └──────────────────────────────────────────────────────┘    │
-├──────────────────────────────────────────────────────────────┤
-│                       DOMAIN LAYER                            │
-│  Instrument  Equity  DerivativeContract  Index               │
-│  AssetClass  Interval  CoverageRange  Candle                 │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### Source tree
+## 🏗️ Codebase Structure
 
 ```
 src/nse_relative/
 │
-├── presentation/
-│   └── cli.py                       # 🆕 Thin CLI entry point
+├── cli.py                          # CLI entry point (argparse + dispatch)
+├── __init__.py                     # Package metadata
+├── __main__.py                     # `python -m nse_relative` entry
+│
+├── config/
+│   ├── settings.py                 # All env-var configuration
+│   └── logger.py                   # Logging setup
+│
+├── domain/
+│   ├── models.py                   # Domain models: OptionContract, enums, value objects
+│   └── coverage.py                 # CoverageRange, CheckpointData
 │
 ├── application/
-│   └── services/
-│       ├── fetch_orchestrator.py    # 🆕 Coordinates multi-source fetching
-│       └── instrument_service.py    # 🆕 Query stored instruments/coverage
+│   └── fetch_service.py            # Fetch orchestration + dependency wiring
 │
 ├── infrastructure/
 │   ├── api/
-│   │   ├── rate_limiter.py          # Thread-safe exponential backoff
-│   │   └── symbol_registry.py       # 🆕 Live NSE index + Upstox instrument resolution
-│   ├── persistence/
-│   │   ├── checkpoint_store.py      # 🆕 Per-provider fetch tracking
-│   │   ├── metadata_catalog.py      # 🆕 Unified Parquet-based registry
-│   │   └── serializers.py           # 🆕 Parquet/CSV read/write helpers
-│   ├── providers/
-│   │   ├── base.py                  # 🆕 DataProvider ABC
-│   │   ├── nse_provider.py          # 🆕 NSE API — equities + index
-│   │   └── upstox_provider.py       # 🆕 Upstox API — equities + F&O (merged)
-│   └── repositories/
-│       ├── equity_repository.py     # 🆕 data/{provider}/equities/{sym}.parquet
-│       ├── derivative_repository.py # 🆕 data/{provider}/derivatives/{sym}.parquet
-│       └── index_repository.py      # 🆕 data/{provider}/indices/{sym}.parquet
+│   │   ├── nse_client.py           # NSE HTTP client + response parsing
+│   │   └── upstox_client.py        # Upstox HTTP client (shared by equity + F&O)
+│   ├── checkpoint/
+│   │   └── json_checkpoint.py      # Per-provider incremental fetch tracking
+│   ├── storage/
+│   │   ├── repository.py           # Storage protocol/interface
+│   │   ├── file_repository.py      # Filesystem implementation (Parquet/CSV)
+│   │   └── manifest.py             # Contract manifest CRUD
+│   └── symbol_source/
+│       ├── nse_index_csv.py        # NSE index constituent fetcher
+│       └── upstox_instruments.py   # Upstox instrument master + option discovery
 │
-├── domain/
-│   ├── instruments.py               # 🆕 Instrument, Equity, DerivativeContract, Index
-│   ├── data_types.py                # 🆕 AssetClass, Interval, CoverageRange, Candle
-│   └── exceptions.py                # 🆕 PipelineError, FetchError, etc.
+├── pipeline/
+│   ├── base.py                     # DataProvider abstract base
+│   ├── nse_provider.py            # NSE equity + index fetching
+│   ├── upstox_provider.py         # Upstox equity fetching
+│   └── upstox_options_provider.py # 🎯 F&O options + futures fetching
 │
-├── config/
-│   ├── settings.py                  # Settings dataclass (from env vars)
-│   └── logger.py                    # Logging setup
-│
-└── pipeline/                        # 🔄 Backward-compat re-exports of old API
-    └── ...
+└── shared/
+    ├── rate_limiter.py             # Exponential backoff rate limiter
+    ├── exceptions.py               # Domain exception hierarchy
+    └── utils.py                    # Date helpers
 ```
 
 ### Data flow
 
 ```
-NSE website API ──→ NSEProvider ──→ EquityRepository ──→ data/nse/equities/{sym}.parquet
-                                    IndexRepository  ──→ data/nse/indices/{sym}.parquet
+                    ┌──────────────────┐
+                    │     Upstox API    │
+                    │  V2 Historical    │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼                             ▼
+    ┌─────────────────┐          ┌────────────────────┐
+    │  UpstoxProvider  │          │UpstoxOptionsProvider│
+    │  (equities)      │          │  (options/futures)  │
+    │                  │          │                     │
+    │  ISIN-filtered   │          │  instrument master  │
+    │  symbol list     │          │  → discover contracts│
+    │  from NSE index  │          │  → filter by expiry │
+    └────────┬─────────┘          │  → all strikes × CE/PE
+             │                    └──────────┬──────────┘
+             ▼                               ▼
+    ┌─────────────────┐          ┌────────────────────┐
+    │  FileStorageRepo │          │  FileStorageRepo    │
+    │  data/upstox/    │          │  data/upstox/       │
+    │  {sym}.parquet   │          │  upstox_options/    │
+    └─────────────────┘          └────────────────────┘
 
-Upstox API ──→ UpstoxProvider ──→ EquityRepository ──→ data/upstox/equities/{sym}.parquet
-                                  DerivativeRepository ──→ data/upstox/derivatives/{sym}.parquet
-                                                        ─→ data/upstox/derivatives/_contracts.parquet
+    ┌──────────────────┐
+    │    NSE Website   │
+    │  Public API      │
+    └────────┬─────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │  NSEProvider     │
+    │  (equities+index)│
+    └────────┬─────────┘
+             ▼
+    ┌─────────────────┐
+    │  FileStorageRepo │
+    │  data/nse/       │
+    │  equities.parquet│
+    │  indices.parquet │
+    └─────────────────┘
 ```
-
-Each fetch operation:
-1. Checks **CheckpointStore** — skips symbols whose date range is already covered
-2. Fetches missing data from the API (with rate limiting)
-3. Saves to the appropriate **Repository** (append + deduplicate)
-4. Updates **CheckpointStore** with new date coverage
-5. Registers in **MetadataCatalog** for unified querying
-
-### Why this architecture?
-
-| Principle | How it's applied |
-|---|---|
-| **Separation of Concerns** | Domain / Infrastructure / Application / Presentation layers |
-| **Single Responsibility** | Each class has one job (fetch, store, query, orchestrate) |
-| **Repository Pattern** | Consistent read/write/query interface for all asset types |
-| **Dependency Injection** | Providers receive their symbol registry, catalog via constructor |
-| **Domain Model** | `Instrument` hierarchy captures real-world structure |
-| **Composition over Inheritance** | Providers compose repositories + checkpoint + catalog |
 
 ---
 
 ## ⚙️ Configuration
 
-All settings are loaded from environment variables (with optional `.env` file). Copy `.env.example` → `.env` and adjust:
+Copy `.env.example` → `.env` and adjust as needed:
 
 | Variable | Default | Description |
 |---|---|---|
 | **NSE** | | |
-| `NSE_FETCH_START` | `01-01-2021` | Data fetch start date (DD-MM-YYYY) |
-| `NSE_FETCH_END` | (today) | Data fetch end date |
-| `NSE_FETCH_CHUNK_DAYS` | `110` | API chunk size (max 70 records/call) |
-| `NSE_STORAGE_FORMAT` | `parquet` | Storage format (`parquet` or `csv`) |
-| `NSE_RATE_MAX_WORKERS` | `5` | Parallel fetch workers |
+| `NSE_DEFAULT_INDEX` | `nifty500` | Default NSE index |
+| `NSE_FETCH_START` | `01-01-2021` | Fetch start (DD-MM-YYYY) |
+| `NSE_FETCH_END` | (today) | Fetch end date |
+| `NSE_FETCH_CHUNK_DAYS` | `110` | API chunk size |
+| `NSE_STORAGE_FORMAT` | `parquet` | `parquet` or `csv` |
+| `NSE_RATE_MAX_WORKERS` | `5` | Parallel workers |
 | `NSE_LOG_LEVEL` | `INFO` | Logging verbosity |
 | **Upstox (equities)** | | |
-| `UPSTOX_INTERVAL` | `month` | Candle interval (`day`, `week`, `month`) |
+| `UPSTOX_INTERVAL` | `month` | Candle interval |
 | `UPSTOX_MAX_WORKERS` | `10` | Parallel workers |
 | `UPSTOX_FETCH_START` | `01-01-2000` | Fetch start date |
 | **Upstox (F&O)** | | |
-| `UPSTOX_OPTIONS_INTERVAL` | `day` | Options candle interval |
-| `UPSTOX_OPTIONS_MAX_WORKERS` | `5` | Parallel workers |
-| `UPSTOX_OPTIONS_FETCH_START` | `01-01-2024` | Fetch start date |
-| `UPSTOX_OPTIONS_TYPES` | `OPTSTK` | F&O types (`OPTSTK,OPTIDX`) |
-| `UPSTOX_OPTIONS_N_EXPIRIES` | `2` | Expiry cycles per underlying (`0` = all) |
-| `UPSTOX_OPTIONS_INDEX_NAMES` | (auto) | Restrict index options (e.g. `NIFTY,BANKNIFTY`) |
+| `UPSTOX_OPTIONS_INTERVAL` | `day` | Options interval |
+| `UPSTOX_OPTIONS_FETCH_START` | `01-01-2024` | Fetch start |
+| `UPSTOX_OPTIONS_TYPES` | `OPTSTK` | F&O types to fetch |
+| `UPSTOX_OPTIONS_N_EXPIRIES` | `2` | Expiry cycles per underlying |
+| `UPSTOX_OPTIONS_INDEX_NAMES` | (auto) | Restrict index options |
 
-### Rate limiter settings
-
-| Variable | Default | Description |
-|---|---|---|
-| `NSE_RATE_INITIAL_DELAY` | `0.5` | Initial delay (seconds) |
-| `NSE_RATE_MAX_DELAY` | `30.0` | Maximum delay after backoff |
-| `NSE_RATE_BACKOFF_FACTOR` | `2.0` | Multiplicative backoff factor |
-| `NSE_FETCH_MAX_RETRIES` | `5` | Max retries per request |
-| `NSE_FETCH_SLEEP` | `0.1` | Sleep between requests |
+**Rate limiter:** `NSE_RATE_INITIAL_DELAY=0.5`, `NSE_RATE_MAX_DELAY=30.0`, `NSE_RATE_BACKOFF_FACTOR=2.0`, `NSE_FETCH_MAX_RETRIES=5`
 
 ---
 
 ## 🔧 Development
 
 ```bash
-# Editable install with dev dependencies
+# Editable install
 pip install -e ".[dev]"
 
-# Run tests
+# Tests
 pytest
 
-# Lint + type-check
+# Lint
 ruff check src/
-mypy src/
-
-# Format
 ruff format src/
 
-# See all CLI commands
+# Type-check
+mypy src/
+
+# See commands
 nse-relative --help
 nse-relative fetch --help
 ```
 
-### Migrating from old format
+---
 
-If you have existing data from a previous version (flat files in `data/nse/` and `data/upstox/`), migrate to the new structured layout:
+## 📖 Further Reading
 
-```bash
-nse-relative migrate --provider nse
-nse-relative migrate --provider upstox
-```
-
-This copies all existing data into the new `equities/`, `derivatives/`, and `indices/` subdirectories. Old files remain untouched.
+- **[docs/commands.md](docs/commands.md)** — Full command reference with examples
+- **`.env.example`** — All configurable environment variables
+- **`pyproject.toml`** — Project metadata and dependencies
 
 ---
 
 ## 📄 License
 
-MIT — see [LICENSE](LICENSE).
+MIT

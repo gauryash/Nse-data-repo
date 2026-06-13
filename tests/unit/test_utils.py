@@ -1,6 +1,6 @@
 """Unit tests for shared utilities."""
 
-from nse_relative.shared.utils import make_date_chunks
+from nse_data_pipeline.shared.utils import make_date_chunks
 
 
 class TestMakeDateChunks:

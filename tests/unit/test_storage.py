@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
+from nse_data_pipeline.infrastructure.storage.file_repository import FileStorageRepository
 
 
 class TestFileStorageRepository:

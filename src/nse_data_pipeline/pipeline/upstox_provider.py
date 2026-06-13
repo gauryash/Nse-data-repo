@@ -14,15 +14,15 @@ from datetime import datetime
 
 import pandas as pd
 
-from nse_relative.config.logger import get_logger
-from nse_relative.config.settings import settings
-from nse_relative.infrastructure.api.upstox_client import TIME_ZONE as UPSTOX_TIME_ZONE
-from nse_relative.infrastructure.api.upstox_client import UpstoxClient
-from nse_relative.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
-from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
-from nse_relative.infrastructure.symbol_source import upstox_instruments as upstox_src
-from nse_relative.infrastructure.symbol_source.nse_index_csv import DEFAULT_NSE_INDEX
-from nse_relative.pipeline.base import DataProvider
+from nse_data_pipeline.config.logger import get_logger
+from nse_data_pipeline.config.settings import settings
+from nse_data_pipeline.infrastructure.api.upstox_client import TIME_ZONE as UPSTOX_TIME_ZONE
+from nse_data_pipeline.infrastructure.api.upstox_client import UpstoxClient
+from nse_data_pipeline.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
+from nse_data_pipeline.infrastructure.storage.file_repository import FileStorageRepository
+from nse_data_pipeline.infrastructure.symbol_source import upstox_instruments as upstox_src
+from nse_data_pipeline.infrastructure.symbol_source.nse_index_csv import DEFAULT_NSE_INDEX
+from nse_data_pipeline.pipeline.base import DataProvider
 
 logger = get_logger(__name__)
 

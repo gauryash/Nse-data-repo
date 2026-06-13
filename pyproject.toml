@@ -50,10 +50,10 @@ Repository = "https://github.com/yourusername/nse-relative.git"
 Issues = "https://github.com/yourusername/nse-relative/issues"
 
 [project.scripts]
-nse-relative = "nse_relative.cli:main"
+nse-relative = "nse_data_pipeline.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nse_relative"]
+packages = ["src/nse_data_pipeline"]
 
 [tool.ruff]
 target-version = "py310"

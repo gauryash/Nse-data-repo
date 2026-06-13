@@ -14,10 +14,10 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from nse_relative import __version__
-from nse_relative.application.fetch_service import FetchService
-from nse_relative.config.settings import ensure_dirs
-from nse_relative.infrastructure.symbol_source.nse_index_csv import (
+from nse_data_pipeline import __version__
+from nse_data_pipeline.application.fetch_service import PipelineOrchestrator
+from nse_data_pipeline.config.settings import ensure_dirs
+from nse_data_pipeline.infrastructure.symbol_source.nse_index_csv import (
     DEFAULT_NSE_INDEX,
     NSE_INDEX_NAMES,
 )
@@ -132,10 +132,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_fetch(args: argparse.Namespace) -> None:
-    """Dispatch fetch to the appropriate provider via FetchService."""
-    ensure_dirs()
+    """Dispatch fetch to the appropriate provider via PipelineOrchestrator."""
 
-    service = FetchService()
+    service = PipelineOrchestrator()
     service.fetch(
         provider=args.provider,
         index=args.index,
@@ -159,7 +158,7 @@ def _cmd_list_providers() -> None:
 
 
 def _cmd_list_indices() -> None:
-    from nse_relative.infrastructure.symbol_source.nse_index_csv import (
+    from nse_data_pipeline.infrastructure.symbol_source.nse_index_csv import (
         NSE_INDEX_URLS,
     )
 

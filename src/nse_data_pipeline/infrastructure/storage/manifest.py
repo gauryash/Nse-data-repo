@@ -15,8 +15,8 @@ from datetime import date
 
 import pandas as pd
 
-from nse_relative.config.logger import get_logger
-from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
+from nse_data_pipeline.config.logger import get_logger
+from nse_data_pipeline.infrastructure.storage.file_repository import FileStorageRepository
 
 logger = get_logger(__name__)
 

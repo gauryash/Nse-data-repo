@@ -22,7 +22,7 @@ def get_logger(name: str) -> logging.Logger:
     if not _LOG_CONFIGURED:
         _LOG_CONFIGURED = True
         # Set level on the root once
-        from nse_relative.config.settings import settings
+        from nse_data_pipeline.config.settings import settings
 
         logging.getLogger().setLevel(settings.log_level)
 

@@ -13,9 +13,9 @@ import urllib.parse
 import pandas as pd
 import requests
 
-from nse_relative.config.logger import get_logger
-from nse_relative.config.settings import settings
-from nse_relative.shared.rate_limiter import RateLimiter
+from nse_data_pipeline.config.logger import get_logger
+from nse_data_pipeline.config.settings import settings
+from nse_data_pipeline.shared.rate_limiter import RateLimiter
 
 logger = get_logger(__name__)
 

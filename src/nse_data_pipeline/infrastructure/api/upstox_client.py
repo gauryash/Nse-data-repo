@@ -27,8 +27,8 @@ import pandas as pd
 import pytz
 import requests
 
-from nse_relative.config.logger import get_logger
-from nse_relative.config.settings import settings
+from nse_data_pipeline.config.logger import get_logger
+from nse_data_pipeline.config.settings import settings
 
 logger = get_logger(__name__)
 

@@ -394,7 +394,7 @@ venv\Scripts\activate
 pip install -e .
 ```
 
-### `ModuleNotFoundError: No module named 'nse_relative.presentation'`
+### `ModuleNotFoundError: No module named 'nse_data_pipeline.presentation'`
 
 Stale entry point executable. Reinstall:
 
@@ -406,7 +406,7 @@ pip install -e .
 Or use the module directly:
 
 ```bash
-python -m nse_relative fetch --provider upstox --index nifty50
+python -m nse_data_pipeline fetch --provider upstox --index nifty50
 ```
 
 ### Unicode/encoding errors on Windows

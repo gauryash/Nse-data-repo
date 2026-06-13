@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from nse_relative.config.logger import get_logger
+from nse_data_pipeline.config.logger import get_logger
 
 logger = get_logger(__name__)
 

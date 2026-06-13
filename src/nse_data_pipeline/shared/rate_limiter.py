@@ -10,7 +10,7 @@ from __future__ import annotations
 import threading
 import time
 
-from nse_relative.config.settings import settings
+from nse_data_pipeline.config.settings import settings
 
 
 class RateLimiter:

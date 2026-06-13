@@ -4,7 +4,7 @@ from datetime import date
 
 import pandas as pd
 
-from nse_relative.domain.models import (
+from nse_data_pipeline.domain.models import (
     AssetType,
     CandleInterval,
     InstrumentType,

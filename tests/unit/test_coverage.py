@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from nse_relative.domain.coverage import CheckpointData, CoverageRange
+from nse_data_pipeline.domain.coverage import CheckpointData, CoverageRange
 
 
 class TestCoverageRange:

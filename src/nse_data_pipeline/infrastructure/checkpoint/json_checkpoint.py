@@ -32,7 +32,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from nse_relative.config.logger import get_logger
+from nse_data_pipeline.config.logger import get_logger
 
 logger = get_logger(__name__)
 

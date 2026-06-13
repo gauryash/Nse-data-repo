@@ -4,7 +4,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from nse_relative.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
+from nse_data_pipeline.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
 
 
 class TestJsonCheckpoint:
@@ -93,7 +93,7 @@ class TestJsonCheckpoint:
             assert meta["instrument_type"] == "OPTIDX"
             assert meta["strike"] == 23600.0
 
-    def test_corrupt_checkpoint(self, _caplog):
+    def test_corrupt_checkpoint(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "_checkpoint.json"
             path.write_text("{invalid json")

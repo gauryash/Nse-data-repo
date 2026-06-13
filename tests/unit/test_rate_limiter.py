@@ -2,7 +2,7 @@
 
 import time
 
-from nse_relative.shared.rate_limiter import RateLimiter
+from nse_data_pipeline.shared.rate_limiter import RateLimiter
 
 
 class TestRateLimiter:

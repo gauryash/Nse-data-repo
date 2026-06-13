@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from nse_relative.config.logger import get_logger
 
@@ -68,9 +68,7 @@ class JsonCheckpoint:
         try:
             return json.loads(self._path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
-            logger.warning(
-                "Corrupt checkpoint %s: %s — starting fresh", self._path, e
-            )
+            logger.warning("Corrupt checkpoint %s: %s — starting fresh", self._path, e)
             return {}
 
     def write(self, data: dict[str, Any]) -> None:
@@ -85,7 +83,7 @@ class JsonCheckpoint:
     # Per-symbol operations
     # ------------------------------------------------------------------
 
-    def get_coverage(self, symbol: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    def get_coverage(self, symbol: str) -> tuple[datetime | None, datetime | None]:
         """Return ``(date_min, date_max)`` for a symbol, or ``(None, None)``.
 
         Dates are timezone-naive ``datetime`` objects.
@@ -94,16 +92,8 @@ class JsonCheckpoint:
         entry = cp.get("symbols", {}).get(symbol)
         if entry is None:
             return None, None
-        dmin = (
-            datetime.strptime(entry["date_min"], _DATE_FMT)
-            if entry.get("date_min")
-            else None
-        )
-        dmax = (
-            datetime.strptime(entry["date_max"], _DATE_FMT)
-            if entry.get("date_max")
-            else None
-        )
+        dmin = datetime.strptime(entry["date_min"], _DATE_FMT) if entry.get("date_min") else None
+        dmax = datetime.strptime(entry["date_max"], _DATE_FMT) if entry.get("date_max") else None
         return dmin, dmax
 
     def coverage_needed(
@@ -138,7 +128,9 @@ class JsonCheckpoint:
             rows: Number of data rows fetched.
             meta: Optional metadata dict (e.g. ISIN, contract info).
         """
-        fmt = lambda d: d if isinstance(d, str) else d.strftime(_DATE_FMT)
+
+        def fmt(d: str | datetime) -> str:
+            return d if isinstance(d, str) else d.strftime(_DATE_FMT)
 
         cp = self.read()
         symbols = cp.setdefault("symbols", {})

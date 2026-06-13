@@ -15,13 +15,12 @@ Data is cached in memory per-instance for the lifetime of the object.
 from __future__ import annotations
 
 from io import StringIO
-from typing import Optional
 
 import pandas as pd
 import requests
 
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
+from nse_relative.config.settings import settings
 
 logger = get_logger(__name__)
 
@@ -47,7 +46,10 @@ _NSE_INDEX_FILES: dict[str, tuple[str, str]] = {
     "nifty_total_market": (_NSEARCHIVES, "ind_niftytotalmarket_list.csv"),
     "nifty_next_50": (_NSEARCHIVES, "ind_niftynext50list.csv"),
     "nifty500_multicap_50_25_25": (_NSEARCHIVES, "ind_nifty500Multicap502525_list.csv"),
-    "nifty500_large_mid_small_equal": (_NIFTYINDICES, "ind_nifty500LargeMidSmallEqualCapWeighted_list.csv"),
+    "nifty500_large_mid_small_equal": (
+        _NIFTYINDICES,
+        "ind_nifty500LargeMidSmallEqualCapWeighted_list.csv",
+    ),
     "nifty_midcap_50": (_NSEARCHIVES, "ind_niftymidcap50list.csv"),
     "nifty_midcap_150": (_NSEARCHIVES, "ind_niftymidcap150list.csv"),
     "nifty_smallcap_50": (_NSEARCHIVES, "ind_niftysmallcap50list.csv"),
@@ -59,13 +61,18 @@ _NSE_INDEX_FILES: dict[str, tuple[str, str]] = {
     "nifty200_momentum_30": (_NIFTYINDICES, "ind_nifty200Momentum30_list.csv"),
     "nifty_midcap150_momentum_50": (_NIFTYINDICES, "ind_niftymidcap150momentum50_list.csv"),
     "nifty500_momentum_50": (_NIFTYINDICES, "ind_nifty500Momentum50_list.csv"),
-    "nifty_mid_smallcap400_momentum_quality_100": (_NIFTYINDICES, "ind_niftyMidSmallcap400MomentumQuality100_list.csv"),
-    "nifty_smallcap250_momentum_quality_100": (_NIFTYINDICES, "ind_niftySmallcap250MomentumQuality100_list.csv"),
+    "nifty_mid_smallcap400_momentum_quality_100": (
+        _NIFTYINDICES,
+        "ind_niftyMidSmallcap400MomentumQuality100_list.csv",
+    ),
+    "nifty_smallcap250_momentum_quality_100": (
+        _NIFTYINDICES,
+        "ind_niftySmallcap250MomentumQuality100_list.csv",
+    ),
 }
 
 NSE_INDEX_URLS: dict[str, str] = {
-    name: f"{getattr(settings, base)}/{file}"
-    for name, (base, file) in _NSE_INDEX_FILES.items()
+    name: f"{getattr(settings, base)}/{file}" for name, (base, file) in _NSE_INDEX_FILES.items()
 }
 
 DEFAULT_NSE_INDEX = "nifty500"
@@ -113,8 +120,7 @@ class NseIndexConstituents:
         """
         if index_name not in NSE_INDEX_URLS:
             raise ValueError(
-                f"Unknown index '{index_name}'. "
-                f"Choose from: {', '.join(NSE_INDEX_NAMES)}"
+                f"Unknown index '{index_name}'. Choose from: {', '.join(NSE_INDEX_NAMES)}"
             )
 
         if index_name in self._cache:

@@ -12,12 +12,11 @@ The manifest is always stored in Parquet format regardless of
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 
 import pandas as pd
 
-from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
 from nse_relative.config.logger import get_logger
+from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
 
 logger = get_logger(__name__)
 
@@ -116,10 +115,10 @@ class ContractManifest:
 
     def query(
         self,
-        underlying_name: Optional[str] = None,
-        expiry: Optional[str | date] = None,
-        option_type: Optional[str] = None,
-        instrument_type: Optional[str] = None,
+        underlying_name: str | None = None,
+        expiry: str | date | None = None,
+        option_type: str | None = None,
+        instrument_type: str | None = None,
     ) -> pd.DataFrame:
         """Query the contract manifest with optional filters.
 
@@ -155,6 +154,7 @@ class ContractManifest:
         """Return 'pyarrow' if available, else 'fastparquet'."""
         try:
             import pyarrow  # noqa: F401
+
             return "pyarrow"
         except ImportError:
             return "fastparquet"
@@ -169,11 +169,7 @@ class ContractManifest:
             "instrument_type": row.get("instrument_type", ""),
             "option_type": row.get("option_type", ""),
             "expiry": str(row.get("expiry", "")),
-            "strike": float(row["strike"])
-            if pd.notna(row.get("strike"))
-            else None,
-            "lot_size": int(row["lot_size"])
-            if pd.notna(row.get("lot_size"))
-            else None,
+            "strike": float(row["strike"]) if pd.notna(row.get("strike")) else None,
+            "lot_size": int(row["lot_size"]) if pd.notna(row.get("lot_size")) else None,
             "underlying_name": row.get("name", ""),
         }

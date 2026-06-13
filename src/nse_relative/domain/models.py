@@ -7,13 +7,12 @@ of the financial data domain.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional
+from typing import ClassVar
 
 import pandas as pd
-
 
 # ======================================================================
 # Enums
@@ -34,11 +33,7 @@ class InstrumentType(str, Enum):
 
         Example: ``"OPTSTK,OPTIDX"`` → ``[InstrumentType.OPTSTK, InstrumentType.OPTIDX]``
         """
-        return [
-            cls(t.strip())
-            for t in value.replace(",", " ").split()
-            if t.strip()
-        ]
+        return [cls(t.strip()) for t in value.replace(",", " ").split() if t.strip()]
 
 
 class AssetType(str, Enum):
@@ -171,7 +166,7 @@ class OptionContract:
     lot_size: int
     tick_size: float
 
-    _CONTRACT_COLUMNS = [
+    _CONTRACT_COLUMNS: ClassVar[list[str]] = [
         "instrument_key",
         "tradingsymbol",
         "name",
@@ -185,23 +180,19 @@ class OptionContract:
     ]
 
     @classmethod
-    def from_dataframe_row(cls, row: pd.Series) -> "OptionContract":
+    def from_dataframe_row(cls, row: pd.Series) -> OptionContract:
         """Build from a row of the Upstox instrument master CSV."""
         return cls(
             instrument_key=row["instrument_key"],
             tradingsymbol=row["tradingsymbol"],
             underlying_name=row.get("name", ""),
-            underlying_type=AssetType.from_instrument_type(
-                row.get("instrument_type", "")
-            ).value,
+            underlying_type=AssetType.from_instrument_type(row.get("instrument_type", "")).value,
             instrument_type=row.get("instrument_type", ""),
             option_type=row.get("option_type", ""),
             expiry=row["expiry"] if pd.notna(row.get("expiry")) else None,
             strike=float(row["strike"]) if pd.notna(row.get("strike")) else None,
             lot_size=int(row["lot_size"]) if pd.notna(row.get("lot_size")) else 0,
-            tick_size=float(row["tick_size"])
-            if pd.notna(row.get("tick_size"))
-            else 0.05,
+            tick_size=float(row["tick_size"]) if pd.notna(row.get("tick_size")) else 0.05,
         )
 
     def to_dict(self) -> dict:

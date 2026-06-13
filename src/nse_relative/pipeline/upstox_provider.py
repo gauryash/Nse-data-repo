@@ -11,18 +11,18 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import Optional
 
 import pandas as pd
 
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
-from nse_relative.pipeline.base import DataProvider
-from nse_relative.infrastructure.api.upstox_client import UpstoxClient, TIME_ZONE as UPSTOX_TIME_ZONE
-from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
+from nse_relative.config.settings import settings
+from nse_relative.infrastructure.api.upstox_client import TIME_ZONE as UPSTOX_TIME_ZONE
+from nse_relative.infrastructure.api.upstox_client import UpstoxClient
 from nse_relative.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
+from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
 from nse_relative.infrastructure.symbol_source import upstox_instruments as upstox_src
 from nse_relative.infrastructure.symbol_source.nse_index_csv import DEFAULT_NSE_INDEX
+from nse_relative.pipeline.base import DataProvider
 
 logger = get_logger(__name__)
 
@@ -66,14 +66,10 @@ class UpstoxProvider(DataProvider):
             else self._client.parse_date(settings.upstox_fetch_start)
         )
         self._end = (
-            self._client.parse_date(end_date)
-            if end_date
-            else datetime.now(UPSTOX_TIME_ZONE)
+            self._client.parse_date(end_date) if end_date else datetime.now(UPSTOX_TIME_ZONE)
         )
         if self._end < self._start:
-            raise ValueError(
-                f"end_date ({end_date}) < start_date ({start_date})"
-            )
+            raise ValueError(f"end_date ({end_date}) < start_date ({start_date})")
 
         # Build checkpoint
         cp_path = self._storage.checkpoint_path(self.provider)
@@ -104,14 +100,13 @@ class UpstoxProvider(DataProvider):
         instrument_key = sym_info["instrument_key"]
 
         # Checkpoint check
-        if not self._force:
-            if not self._checkpoint.coverage_needed(
-                symbol,
-                self._start.replace(tzinfo=None),
-                self._end.replace(tzinfo=None),
-            ):
-                logger.debug("%s: checkpoint covers range, skip", symbol)
-                return None
+        if not self._force and not self._checkpoint.coverage_needed(
+            symbol,
+            self._start.replace(tzinfo=None),
+            self._end.replace(tzinfo=None),
+        ):
+            logger.debug("%s: checkpoint covers range, skip", symbol)
+            return None
 
         # Fetch via shared client
         df = self._client.fetch_candles(
@@ -125,20 +120,20 @@ class UpstoxProvider(DataProvider):
             df["symbol"] = symbol
             logger.info(
                 "%s: %d rows [%s .. %s]",
-                symbol, len(df),
+                symbol,
+                len(df),
                 df["date"].min().strftime("%Y-%m-%d"),
                 df["date"].max().strftime("%Y-%m-%d"),
             )
             return df
         return None
 
-    def fetch_equities(self, symbols: Optional[list[str]] = None) -> None:
+    def fetch_equities(self, symbols: list[str] | None = None) -> None:
         """Fetch historical data for all Upstox symbols."""
         symboldf = upstox_src.load_equity_symbols(index_name=self._index)
         if symboldf.empty:
             logger.error(
-                "Upstox symbol list is empty. "
-                "Run 'nse-relative fetch --provider upstox' first."
+                "Upstox symbol list is empty. Run 'nse-relative fetch --provider upstox' first."
             )
             return
 
@@ -147,18 +142,16 @@ class UpstoxProvider(DataProvider):
 
         logger.info(
             "Upstox: %d symbols, interval=%s, range=[%s .. %s], force=%s",
-            len(symboldf), self._interval,
+            len(symboldf),
+            self._interval,
             self._start.strftime("%Y-%m-%d"),
             self._end.strftime("%Y-%m-%d"),
             self._force,
         )
 
-        with ThreadPoolExecutor(
-            max_workers=settings.upstox_max_workers
-        ) as pool:
+        with ThreadPoolExecutor(max_workers=settings.upstox_max_workers) as pool:
             fut_map = {
-                pool.submit(self._fetch_one_symbol, symboldf.loc[i]): i
-                for i in symboldf.index
+                pool.submit(self._fetch_one_symbol, symboldf.loc[i]): i for i in symboldf.index
             }
             for future in as_completed(fut_map):
                 idx = fut_map[future]

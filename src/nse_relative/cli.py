@@ -12,14 +12,14 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 from nse_relative import __version__
-from nse_relative.config.settings import settings, ensure_dirs
 from nse_relative.application.fetch_service import FetchService
+from nse_relative.config.settings import ensure_dirs
 from nse_relative.infrastructure.symbol_source.nse_index_csv import (
-    NSE_INDEX_NAMES,
     DEFAULT_NSE_INDEX,
+    NSE_INDEX_NAMES,
 )
 
 VALID_PROVIDERS = ("nse", "upstox", "upstox_options")
@@ -35,22 +35,22 @@ def build_parser() -> argparse.ArgumentParser:
         prog="nse-relative",
         description="NSE / Upstox data pipeline — fetch equities, index, and F&O data.",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
     # ---- fetch ----
     fetch_parser = sub.add_parser("fetch", help="Fetch data from a provider")
     fetch_parser.add_argument(
-        "--provider", "-p",
+        "--provider",
+        "-p",
         choices=VALID_PROVIDERS,
         default="nse",
         help="Data provider (default: nse)",
     )
     fetch_parser.add_argument(
-        "--index", "-x",
+        "--index",
+        "-x",
         choices=NSE_INDEX_NAMES,
         default=DEFAULT_NSE_INDEX,
         help=f"NSE index to source symbols from (default: {DEFAULT_NSE_INDEX})",
@@ -59,52 +59,63 @@ def build_parser() -> argparse.ArgumentParser:
         "--underlying",
         default=None,
         help="Single underlying stock/index name for F&O fetch "
-             "(e.g. WIPRO, NIFTY, RELIANCE); filters contract discovery",
+        "(e.g. WIPRO, NIFTY, RELIANCE); filters contract discovery",
     )
     fetch_parser.add_argument(
-        "--symbols", "-s", nargs="*",
+        "--symbols",
+        "-s",
+        nargs="*",
         help="Specific symbols (NSE: symbols; Upstox: tradingsymbols)",
     )
     fetch_parser.add_argument(
-        "--start", "--from",
+        "--start",
+        "--from",
         dest="start_date",
         default=None,
         help="Fetch start date DD-MM-YYYY (default: from env)",
     )
     fetch_parser.add_argument(
-        "--end", "--to",
+        "--end",
+        "--to",
         dest="end_date",
         default=None,
         help="Fetch end date DD-MM-YYYY (default: from env or today)",
     )
     fetch_parser.add_argument(
-        "--interval", "-i",
+        "--interval",
+        "-i",
         choices=["day", "week", "month"],
         default=None,
         help="Candle interval for Upstox / UpstoxOptions (default: from env)",
     )
     fetch_parser.add_argument(
-        "--instrument-types", "-t",
+        "--instrument-types",
+        "-t",
         default=None,
         help="F&O instrument types for UpstoxOptions, comma-separated "
-             "(default: from env UPSTOX_OPTIONS_TYPES or 'OPTSTK')",
+        "(default: from env UPSTOX_OPTIONS_TYPES or 'OPTSTK')",
     )
     fetch_parser.add_argument(
-        "--include-futures", action="store_true",
+        "--include-futures",
+        action="store_true",
         help="Include FUTSTK (stock futures) in UpstoxOptions fetch",
     )
     fetch_parser.add_argument(
-        "--n-expiries", type=int, default=None,
+        "--n-expiries",
+        type=int,
+        default=None,
         help="Number of upcoming expiry cycles to fetch per underlying "
-             "(default: from env UPSTOX_OPTIONS_N_EXPIRIES or 2; 0 = all)",
+        "(default: from env UPSTOX_OPTIONS_N_EXPIRIES or 2; 0 = all)",
     )
     fetch_parser.add_argument(
-        "--force", "-f",
+        "--force",
+        "-f",
         action="store_true",
         help="Ignore checkpoint and re-fetch all symbols from scratch",
     )
     fetch_parser.add_argument(
-        "--skip-index", action="store_true",
+        "--skip-index",
+        action="store_true",
         help="Skip fetching index data (only applies to NSE)",
     )
 
@@ -151,6 +162,7 @@ def _cmd_list_indices() -> None:
     from nse_relative.infrastructure.symbol_source.nse_index_csv import (
         NSE_INDEX_URLS,
     )
+
     print("Available NSE index constituent lists:")
     for name in sorted(NSE_INDEX_URLS):
         print(f"  - {name}")

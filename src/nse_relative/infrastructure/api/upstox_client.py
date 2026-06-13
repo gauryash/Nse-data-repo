@@ -22,14 +22,13 @@ from __future__ import annotations
 import time
 import urllib.parse
 from datetime import datetime, timedelta
-from typing import Optional
 
 import pandas as pd
 import pytz
 import requests
 
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
+from nse_relative.config.settings import settings
 
 logger = get_logger(__name__)
 
@@ -84,9 +83,7 @@ class UpstoxClient:
         parts: list[pd.DataFrame] = []
         cur = start
         while cur < end:
-            chunk_end = min(
-                cur + timedelta(days=365 * self._chunk_years), end
-            )
+            chunk_end = min(cur + timedelta(days=365 * self._chunk_years), end)
             df = self._fetch_chunk(instrument_key, interval, cur, chunk_end)
             if df is not None:
                 parts.append(df)
@@ -121,9 +118,7 @@ class UpstoxClient:
             f"/{self._fmt_date(chunk_end)}/{self._fmt_date(chunk_start)}"
         )
         try:
-            r = requests.get(
-                url, headers={"accept": "application/json"}, timeout=30
-            )
+            r = requests.get(url, headers={"accept": "application/json"}, timeout=30)
             candles = r.json().get("data", {}).get("candles", [])
             if not candles:
                 return None

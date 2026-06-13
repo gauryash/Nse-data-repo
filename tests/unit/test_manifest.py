@@ -27,18 +27,20 @@ class TestContractManifest:
                 base_dirs={"upstox_options": base / "upstox_options"},
             )
             manifest = ContractManifest(storage, "upstox_options")
-            df = pd.DataFrame({
-                "instrument_key": ["NSE_FO|12345"],
-                "tradingsymbol": ["NIFTY26JUN23600CE"],
-                "name": ["NIFTY"],
-                "underlying_type": ["INDEX"],
-                "instrument_type": ["OPTIDX"],
-                "option_type": ["CE"],
-                "expiry": ["2026-06-09"],
-                "strike": [23600.0],
-                "lot_size": [65],
-                "tick_size": [0.05],
-            })
+            df = pd.DataFrame(
+                {
+                    "instrument_key": ["NSE_FO|12345"],
+                    "tradingsymbol": ["NIFTY26JUN23600CE"],
+                    "name": ["NIFTY"],
+                    "underlying_type": ["INDEX"],
+                    "instrument_type": ["OPTIDX"],
+                    "option_type": ["CE"],
+                    "expiry": ["2026-06-09"],
+                    "strike": [23600.0],
+                    "lot_size": [65],
+                    "tick_size": [0.05],
+                }
+            )
             manifest.save(df)
             loaded = manifest.load()
             assert len(loaded) == 1
@@ -51,18 +53,20 @@ class TestContractManifest:
                 base_dirs={"upstox_options": base / "upstox_options"},
             )
             manifest = ContractManifest(storage, "upstox_options")
-            df1 = pd.DataFrame({
-                "instrument_key": ["NSE_FO|12345"],
-                "tradingsymbol": ["NIFTY26JUN23600CE"],
-                "name": ["NIFTY"],
-                "underlying_type": ["INDEX"],
-                "instrument_type": ["OPTIDX"],
-                "option_type": ["CE"],
-                "expiry": ["2026-06-09"],
-                "strike": [23600.0],
-                "lot_size": [65],
-                "tick_size": [0.05],
-            })
+            df1 = pd.DataFrame(
+                {
+                    "instrument_key": ["NSE_FO|12345"],
+                    "tradingsymbol": ["NIFTY26JUN23600CE"],
+                    "name": ["NIFTY"],
+                    "underlying_type": ["INDEX"],
+                    "instrument_type": ["OPTIDX"],
+                    "option_type": ["CE"],
+                    "expiry": ["2026-06-09"],
+                    "strike": [23600.0],
+                    "lot_size": [65],
+                    "tick_size": [0.05],
+                }
+            )
             manifest.save(df1)
             manifest.save(df1)  # same data again
             loaded = manifest.load()
@@ -75,32 +79,36 @@ class TestContractManifest:
                 base_dirs={"upstox_options": base / "upstox_options"},
             )
             manifest = ContractManifest(storage, "upstox_options")
-            df = pd.DataFrame({
-                "instrument_key": ["NSE_FO|1", "NSE_FO|2"],
-                "tradingsymbol": ["NIFTY26JUN23600CE", "NIFTY26JUN23600PE"],
-                "name": ["NIFTY", "NIFTY"],
-                "underlying_type": ["INDEX", "INDEX"],
-                "instrument_type": ["OPTIDX", "OPTIDX"],
-                "option_type": ["CE", "PE"],
-                "expiry": ["2026-06-09", "2026-06-09"],
-                "strike": [23600.0, 23600.0],
-                "lot_size": [65, 65],
-                "tick_size": [0.05, 0.05],
-            })
+            df = pd.DataFrame(
+                {
+                    "instrument_key": ["NSE_FO|1", "NSE_FO|2"],
+                    "tradingsymbol": ["NIFTY26JUN23600CE", "NIFTY26JUN23600PE"],
+                    "name": ["NIFTY", "NIFTY"],
+                    "underlying_type": ["INDEX", "INDEX"],
+                    "instrument_type": ["OPTIDX", "OPTIDX"],
+                    "option_type": ["CE", "PE"],
+                    "expiry": ["2026-06-09", "2026-06-09"],
+                    "strike": [23600.0, 23600.0],
+                    "lot_size": [65, 65],
+                    "tick_size": [0.05, 0.05],
+                }
+            )
             manifest.save(df)
             result = manifest.query(option_type="CE")
             assert len(result) == 1
             assert result["tradingsymbol"].iloc[0] == "NIFTY26JUN23600CE"
 
     def test_build_checkpoint_entry(self):
-        row = pd.Series({
-            "instrument_type": "OPTIDX",
-            "option_type": "CE",
-            "expiry": "2026-06-09",
-            "strike": 23600.0,
-            "lot_size": 65,
-            "name": "NIFTY",
-        })
+        row = pd.Series(
+            {
+                "instrument_type": "OPTIDX",
+                "option_type": "CE",
+                "expiry": "2026-06-09",
+                "strike": 23600.0,
+                "lot_size": 65,
+                "name": "NIFTY",
+            }
+        )
         entry = ContractManifest.build_checkpoint_entry(row)
         assert entry["instrument_type"] == "OPTIDX"
         assert entry["expiry"] == "2026-06-09"

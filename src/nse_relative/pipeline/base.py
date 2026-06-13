@@ -11,7 +11,6 @@ Providers accept their dependencies via constructor injection.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from nse_relative.config.logger import get_logger
 
@@ -35,14 +34,14 @@ class DataProvider(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def fetch_equities(self, symbols: Optional[list[str]] = None) -> None:
+    def fetch_equities(self, symbols: list[str] | None = None) -> None:
         """Fetch daily / periodic equity data and persist to storage."""
 
     @abstractmethod
     def fetch_index(self) -> None:
         """Fetch index / benchmark data (if available) and persist."""
 
-    def fetch_options(self, symbols: Optional[list[str]] = None) -> None:
+    def fetch_options(self, _symbols: list[str] | None = None) -> None:
         """Fetch historical options / F&O data and persist to storage.
 
         Base implementation logs a skip message. Providers that support

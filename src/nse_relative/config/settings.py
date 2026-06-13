@@ -64,7 +64,7 @@ def _find_project_root() -> Path:
         return Path(env).resolve()
 
     here = Path(__file__).resolve()
-    for parent in [here] + list(here.parents):
+    for parent in [here, *list(here.parents)]:
         if (parent / "pyproject.toml").is_file():
             return parent
 
@@ -242,5 +242,9 @@ _sync_legacy_aliases()
 
 def ensure_dirs() -> None:
     """Create all data directories if they don't exist."""
-    for d in (settings.nse_storage_dir, settings.upstox_storage_dir, settings.upstox_options_storage_dir):
+    for d in (
+        settings.nse_storage_dir,
+        settings.upstox_storage_dir,
+        settings.upstox_options_storage_dir,
+    ):
         d.mkdir(parents=True, exist_ok=True)

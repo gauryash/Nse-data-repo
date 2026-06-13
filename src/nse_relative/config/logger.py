@@ -1,4 +1,5 @@
 """Logging setup for the package."""
+
 import logging
 import sys
 

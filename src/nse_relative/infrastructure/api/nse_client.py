@@ -8,16 +8,13 @@ index charts.
 
 from __future__ import annotations
 
-import time
 import urllib.parse
-from datetime import datetime
-from typing import Any, Optional
 
 import pandas as pd
 import requests
 
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
+from nse_relative.config.settings import settings
 from nse_relative.shared.rate_limiter import RateLimiter
 
 logger = get_logger(__name__)
@@ -41,7 +38,7 @@ class NseClient:
         base_url: str = settings.nse_base_url,
         index_url: str = settings.nse_index_url,
         max_retries: int = settings.nse_fetch_max_retries,
-        rate_limiter: Optional[RateLimiter] = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         self._base_url = base_url
         self._index_url = index_url
@@ -63,16 +60,18 @@ class NseClient:
     def _create_session(self) -> requests.Session:
         """Create a session with browser-like headers."""
         s = requests.Session()
-        s.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": f"{self._nse_domain()}/",
-        })
+        s.headers.update(
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": f"{self._nse_domain()}/",
+            }
+        )
         return s
 
     # ------------------------------------------------------------------
@@ -119,7 +118,10 @@ class NseClient:
             except requests.RequestException as e:
                 logger.warning(
                     "%s attempt %d/%d: %s",
-                    symbol, attempt + 1, self._max_retries, e,
+                    symbol,
+                    attempt + 1,
+                    self._max_retries,
+                    e,
                 )
                 if attempt < self._max_retries - 1:
                     self._rate_limiter.wait(symbol)
@@ -166,7 +168,9 @@ class NseClient:
             except requests.RequestException as e:
                 logger.warning(
                     "Index error attempt %d/%d: %s",
-                    attempt + 1, self._max_retries, e,
+                    attempt + 1,
+                    self._max_retries,
+                    e,
                 )
                 if attempt < self._max_retries - 1:
                     self._rate_limiter.wait(index_name)
@@ -183,26 +187,37 @@ class NseClient:
         """Convert raw NSE API response to normalized DataFrame."""
         if not isinstance(data, list) or not data:
             return pd.DataFrame()
-        df = pd.DataFrame(data).rename(columns={
-            "chPreviousClsPrice": "Prev_Close",
-            "chOpeningPrice": "Open",
-            "chTradeHighPrice": "High",
-            "chTradeLowPrice": "Low",
-            "chLastTradedPrice": "Last_Price",
-            "chClosingPrice": "Close",
-            "vwap": "VWAP",
-            "chTotTradedQty": "Volume",
-            "chTotTradedVal": "Turnover",
-            "chTotalTrades": "Trades",
-            "ch52WeekHighPrice": "52W_High",
-            "ch52WeekLowPrice": "52W_Low",
-            "mtimestamp": "Date",
-        })
+        df = pd.DataFrame(data).rename(
+            columns={
+                "chPreviousClsPrice": "Prev_Close",
+                "chOpeningPrice": "Open",
+                "chTradeHighPrice": "High",
+                "chTradeLowPrice": "Low",
+                "chLastTradedPrice": "Last_Price",
+                "chClosingPrice": "Close",
+                "vwap": "VWAP",
+                "chTotTradedQty": "Volume",
+                "chTotTradedVal": "Turnover",
+                "chTotalTrades": "Trades",
+                "ch52WeekHighPrice": "52W_High",
+                "ch52WeekLowPrice": "52W_Low",
+                "mtimestamp": "Date",
+            }
+        )
         df["Symbol"] = symbol
         df["Date"] = pd.to_datetime(df["Date"], format="%d-%b-%Y")
         cols = [
-            "Symbol", "Date", "Open", "High", "Low", "Close",
-            "Prev_Close", "Volume", "VWAP", "52W_High", "52W_Low",
+            "Symbol",
+            "Date",
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Prev_Close",
+            "Volume",
+            "VWAP",
+            "52W_High",
+            "52W_Low",
         ]
         return df[[c for c in cols if c in df.columns]]
 
@@ -211,9 +226,11 @@ class NseClient:
         """Convert raw NSE index chart response to list of dicts."""
         rows: list[dict] = []
         for point in data:
-            rows.append({
-                "Symbol": ticker,
-                "Date": pd.to_datetime(point[0], unit="ms"),
-                "Close": point[1],
-            })
+            rows.append(
+                {
+                    "Symbol": ticker,
+                    "Date": pd.to_datetime(point[0], unit="ms"),
+                    "Close": point[1],
+                }
+            )
         return rows

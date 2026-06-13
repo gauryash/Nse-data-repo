@@ -1,6 +1,5 @@
 """Unit tests for JSON checkpoint."""
 
-import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -94,7 +93,7 @@ class TestJsonCheckpoint:
             assert meta["instrument_type"] == "OPTIDX"
             assert meta["strike"] == 23600.0
 
-    def test_corrupt_checkpoint(self, caplog):
+    def test_corrupt_checkpoint(self, _caplog):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "_checkpoint.json"
             path.write_text("{invalid json")

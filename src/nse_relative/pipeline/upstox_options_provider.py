@@ -19,19 +19,19 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime
-from typing import Optional
 
 import pandas as pd
 
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
-from nse_relative.pipeline.base import DataProvider
-from nse_relative.infrastructure.api.upstox_client import UpstoxClient, TIME_ZONE as UPSTOX_TIME_ZONE
+from nse_relative.config.settings import settings
+from nse_relative.infrastructure.api.upstox_client import TIME_ZONE as UPSTOX_TIME_ZONE
+from nse_relative.infrastructure.api.upstox_client import UpstoxClient
+from nse_relative.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
 from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
 from nse_relative.infrastructure.storage.manifest import ContractManifest
-from nse_relative.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
 from nse_relative.infrastructure.symbol_source import upstox_instruments as upstox_src
 from nse_relative.infrastructure.symbol_source.nse_index_csv import DEFAULT_NSE_INDEX
+from nse_relative.pipeline.base import DataProvider
 
 logger = get_logger(__name__)
 
@@ -88,9 +88,7 @@ class UpstoxOptionsProvider(DataProvider):
             ]
         elif isinstance(instrument_types, str):
             self._instrument_types = [
-                t.strip()
-                for t in instrument_types.replace(",", " ").split()
-                if t.strip()
+                t.strip() for t in instrument_types.replace(",", " ").split() if t.strip()
             ]
         else:
             self._instrument_types = list(instrument_types)
@@ -102,14 +100,10 @@ class UpstoxOptionsProvider(DataProvider):
             else self._client.parse_date(settings.upstox_options_fetch_start)
         )
         self._end = (
-            self._client.parse_date(end_date)
-            if end_date
-            else datetime.now(UPSTOX_TIME_ZONE)
+            self._client.parse_date(end_date) if end_date else datetime.now(UPSTOX_TIME_ZONE)
         )
         if self._end < self._start:
-            raise ValueError(
-                f"end_date ({end_date}) < start_date ({start_date})"
-            )
+            raise ValueError(f"end_date ({end_date}) < start_date ({start_date})")
 
         # Build checkpoint
         cp_path = self._storage.checkpoint_path(self.provider)
@@ -138,7 +132,7 @@ class UpstoxOptionsProvider(DataProvider):
     # Abstract method stubs
     # ------------------------------------------------------------------
 
-    def fetch_equities(self, symbols: Optional[list[str]] = None) -> None:
+    def fetch_equities(self, _symbols: list[str] | None = None) -> None:
         """Not applicable — use ``UpstoxProvider`` for equity data."""
         logger.info("UpstoxOptions: equity fetching not applicable — skip.")
 
@@ -152,7 +146,7 @@ class UpstoxOptionsProvider(DataProvider):
 
     def fetch_options(
         self,
-        symbols: Optional[list[str]] = None,
+        symbols: list[str] | None = None,
         n_expiries: int | None = None,
         underlying: str | None = None,
     ) -> None:
@@ -177,9 +171,7 @@ class UpstoxOptionsProvider(DataProvider):
                 include_futures=self._include_futures,
             )
             if effective_n > 0:
-                symboldf = upstox_src.filter_by_expiry(
-                    symboldf, n_expiries=effective_n
-                )
+                symboldf = upstox_src.filter_by_expiry(symboldf, n_expiries=effective_n)
 
         if symboldf.empty:
             logger.error(
@@ -203,12 +195,15 @@ class UpstoxOptionsProvider(DataProvider):
                 logger.warning(
                     "Underlying '%s' not found among %d discovered contracts — "
                     "check spelling (expected: RELIANCE, WIPRO, NIFTY, etc.)",
-                    underlying, before,
+                    underlying,
+                    before,
                 )
                 return
             logger.info(
                 "Underlying filter '%s': %d -> %d contracts",
-                underlying, before, len(symboldf),
+                underlying,
+                before,
+                len(symboldf),
             )
 
         # Ensure unique integer index to avoid .loc[i] returning a DataFrame
@@ -217,7 +212,9 @@ class UpstoxOptionsProvider(DataProvider):
         logger.info(
             "UpstoxOptions: %d contracts, interval=%s, types=%s, "
             "n_expiries=%s, range=[%s .. %s], force=%s",
-            len(symboldf), self._interval, self._instrument_types,
+            len(symboldf),
+            self._interval,
+            self._instrument_types,
             effective_n if symbols is None else "ALL",
             self._start.strftime("%Y-%m-%d"),
             self._end.strftime("%Y-%m-%d"),
@@ -225,12 +222,9 @@ class UpstoxOptionsProvider(DataProvider):
         )
 
         # Fetch each contract in parallel
-        with ThreadPoolExecutor(
-            max_workers=settings.upstox_options_max_workers
-        ) as pool:
+        with ThreadPoolExecutor(max_workers=settings.upstox_options_max_workers) as pool:
             fut_map = {
-                pool.submit(self._fetch_one_contract, symboldf.loc[i]): i
-                for i in symboldf.index
+                pool.submit(self._fetch_one_contract, symboldf.loc[i]): i for i in symboldf.index
             }
             for future in as_completed(fut_map):
                 idx = fut_map[future]
@@ -246,7 +240,9 @@ class UpstoxOptionsProvider(DataProvider):
                     if df is not None:
                         df = self._attach_metadata(df, row)
                         self._storage.save_option(
-                            df, self.provider, symbol,
+                            df,
+                            self.provider,
+                            symbol,
                             underlying=underlying_short,
                             expiry_date=expiry_date_str,
                         )
@@ -266,9 +262,7 @@ class UpstoxOptionsProvider(DataProvider):
         # Save contract manifest
         if not symboldf.empty:
             self._manifest.save(symboldf)
-            logger.info(
-                "Contract manifest updated (%d contracts)", len(symboldf)
-            )
+            logger.info("Contract manifest updated (%d contracts)", len(symboldf))
 
         logger.info("UpstoxOptions fetch complete.")
 
@@ -283,24 +277,27 @@ class UpstoxOptionsProvider(DataProvider):
 
         # Skip if contract expired before our start date
         contract_expiry = row.get("expiry")
-        if contract_expiry is not None and isinstance(contract_expiry, date):
-            if contract_expiry < self._start.date():
-                logger.debug(
-                    "%s: expired %s before fetch start %s — skip",
-                    symbol, contract_expiry,
-                    self._start.strftime("%Y-%m-%d"),
-                )
-                return None
+        if (
+            contract_expiry is not None
+            and isinstance(contract_expiry, date)
+            and contract_expiry < self._start.date()
+        ):
+            logger.debug(
+                "%s: expired %s before fetch start %s — skip",
+                symbol,
+                contract_expiry,
+                self._start.strftime("%Y-%m-%d"),
+            )
+            return None
 
         # Checkpoint check
-        if not self._force:
-            if not self._checkpoint.coverage_needed(
-                symbol,
-                self._start.replace(tzinfo=None),
-                self._end.replace(tzinfo=None),
-            ):
-                logger.debug("%s: checkpoint covers range, skip", symbol)
-                return None
+        if not self._force and not self._checkpoint.coverage_needed(
+            symbol,
+            self._start.replace(tzinfo=None),
+            self._end.replace(tzinfo=None),
+        ):
+            logger.debug("%s: checkpoint covers range, skip", symbol)
+            return None
 
         # Fetch via shared UpstoxClient
         df = self._client.fetch_candles(
@@ -314,7 +311,8 @@ class UpstoxOptionsProvider(DataProvider):
             df["symbol"] = symbol
             logger.info(
                 "%s: %d rows [%s .. %s]",
-                symbol, len(df),
+                symbol,
+                len(df),
                 df["date"].min().strftime("%Y-%m-%d"),
                 df["date"].max().strftime("%Y-%m-%d"),
             )
@@ -343,12 +341,8 @@ class UpstoxOptionsProvider(DataProvider):
             expiry_str = ""
         df["expiry"] = expiry_str
 
-        df["strike"] = (
-            float(row["strike"]) if pd.notna(row.get("strike")) else 0.0
-        )
-        df["lot_size"] = (
-            int(row["lot_size"]) if pd.notna(row.get("lot_size")) else 0
-        )
+        df["strike"] = float(row["strike"]) if pd.notna(row.get("strike")) else 0.0
+        df["lot_size"] = int(row["lot_size"]) if pd.notna(row.get("lot_size")) else 0
         df["underlying_name"] = str(row.get("name", ""))
         return df
 
@@ -356,9 +350,7 @@ class UpstoxOptionsProvider(DataProvider):
     # Symbol resolution (when user provides tradingsymbols)
     # ------------------------------------------------------------------
 
-    def _resolve_provided_symbols(
-        self, symbols: list[str]
-    ) -> pd.DataFrame:
+    def _resolve_provided_symbols(self, symbols: list[str]) -> pd.DataFrame:
         """Look up contract metadata for user-provided tradingsymbols."""
         from nse_relative.domain.models import AssetType
 
@@ -370,16 +362,24 @@ class UpstoxOptionsProvider(DataProvider):
             missing = set(symbols) - set(matched["tradingsymbol"])
             logger.warning(
                 "%d tradingsymbol(s) not found in NSE_FO master: %s",
-                len(missing), sorted(missing),
+                len(missing),
+                sorted(missing),
             )
         matched["underlying_type"] = matched["instrument_type"].apply(
             lambda t: AssetType.from_instrument_type(t).value
         )
         return matched[
             [
-                "instrument_key", "tradingsymbol", "name", "underlying_type",
-                "instrument_type", "option_type", "expiry", "strike",
-                "lot_size", "tick_size",
+                "instrument_key",
+                "tradingsymbol",
+                "name",
+                "underlying_type",
+                "instrument_type",
+                "option_type",
+                "expiry",
+                "strike",
+                "lot_size",
+                "tick_size",
             ]
         ]
 

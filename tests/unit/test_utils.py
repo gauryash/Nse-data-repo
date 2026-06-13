@@ -20,6 +20,7 @@ class TestMakeDateChunks:
         # Verify no gaps
         for i in range(len(chunks) - 1):
             from datetime import datetime
+
             end_current = datetime.strptime(chunks[i][1], "%d-%m-%Y")
             start_next = datetime.strptime(chunks[i + 1][0], "%d-%m-%Y")
-            assert (start_next - end_current).days == 1, f"Gap between chunks {i} and {i+1}"
+            assert (start_next - end_current).days == 1, f"Gap between chunks {i} and {i + 1}"

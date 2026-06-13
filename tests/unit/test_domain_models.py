@@ -3,7 +3,6 @@
 from datetime import date
 
 import pandas as pd
-import pytest
 
 from nse_relative.domain.models import (
     AssetType,
@@ -41,17 +40,19 @@ class TestEnums:
 
 class TestOptionContract:
     def test_from_dataframe_row(self):
-        row = pd.Series({
-            "instrument_key": "NSE_FO|12345",
-            "tradingsymbol": "NIFTY26JUN23600CE",
-            "name": "NIFTY",
-            "instrument_type": "OPTIDX",
-            "option_type": "CE",
-            "expiry": date(2026, 6, 9),
-            "strike": 23600.0,
-            "lot_size": 65,
-            "tick_size": 0.05,
-        })
+        row = pd.Series(
+            {
+                "instrument_key": "NSE_FO|12345",
+                "tradingsymbol": "NIFTY26JUN23600CE",
+                "name": "NIFTY",
+                "instrument_type": "OPTIDX",
+                "option_type": "CE",
+                "expiry": date(2026, 6, 9),
+                "strike": 23600.0,
+                "lot_size": 65,
+                "tick_size": 0.05,
+            }
+        )
         contract = OptionContract.from_dataframe_row(row)
         assert contract.instrument_key == "NSE_FO|12345"
         assert contract.tradingsymbol == "NIFTY26JUN23600CE"
@@ -65,17 +66,19 @@ class TestOptionContract:
         assert contract.tick_size == 0.05
 
     def test_from_dataframe_row_futures(self):
-        row = pd.Series({
-            "instrument_key": "NSE_FO|67890",
-            "tradingsymbol": "RELIANCE26JUNFUT",
-            "name": "RELIANCE",
-            "instrument_type": "FUTSTK",
-            "option_type": "FF",
-            "expiry": date(2026, 6, 25),
-            "strike": None,
-            "lot_size": 250,
-            "tick_size": 0.05,
-        })
+        row = pd.Series(
+            {
+                "instrument_key": "NSE_FO|67890",
+                "tradingsymbol": "RELIANCE26JUNFUT",
+                "name": "RELIANCE",
+                "instrument_type": "FUTSTK",
+                "option_type": "FF",
+                "expiry": date(2026, 6, 25),
+                "strike": None,
+                "lot_size": 250,
+                "tick_size": 0.05,
+            }
+        )
         contract = OptionContract.from_dataframe_row(row)
         assert contract.strike is None
         assert contract.option_type == "FF"

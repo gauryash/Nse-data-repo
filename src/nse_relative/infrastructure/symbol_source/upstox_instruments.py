@@ -15,13 +15,12 @@ from __future__ import annotations
 
 from datetime import date as date_type
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
-from nse_relative.domain.models import AssetType, OptionContract
+from nse_relative.config.settings import settings
+from nse_relative.domain.models import OptionContract
 
 logger = get_logger(__name__)
 
@@ -65,9 +64,7 @@ def get_equity_symbols(
         output_path = settings.data_dir / f"SymbolList_{index_name}.xlsx"
     if output_path is not None:
         filtered.to_excel(str(output_path), index=False)
-        logger.info(
-            "Saved %d Upstox symbols to %s", len(filtered), output_path
-        )
+        logger.info("Saved %d Upstox symbols to %s", len(filtered), output_path)
 
     return filtered
 
@@ -97,11 +94,10 @@ def load_equity_symbols(
         from nse_relative.infrastructure.symbol_source.nse_index_csv import (
             NseIndexConstituents,
         )
+
         idx = NseIndexConstituents()
         isin_set = idx.get_isin_set(index_name)
-        return get_equity_symbols(
-            isin_set, index_name=index_name, output_path=excel_path
-        )
+        return get_equity_symbols(isin_set, index_name=index_name, output_path=excel_path)
     return pd.read_excel(str(excel_path))
 
 
@@ -137,8 +133,16 @@ def get_fno_symbols(
     fno_df = fno_df[fno_df["instrument_type"].isin(types_list)]
     return fno_df[
         [
-            "instrument_key", "tradingsymbol", "name", "instrument_type",
-            "option_type", "expiry", "strike", "lot_size", "exchange", "tick_size",
+            "instrument_key",
+            "tradingsymbol",
+            "name",
+            "instrument_type",
+            "option_type",
+            "expiry",
+            "strike",
+            "lot_size",
+            "exchange",
+            "tick_size",
         ]
     ]
 
@@ -187,11 +191,7 @@ def discover_option_contracts(
     if instrument_types is None:
         types_list = ["OPTSTK", "OPTIDX"]
     elif isinstance(instrument_types, str):
-        types_list = [
-            t.strip()
-            for t in instrument_types.replace(",", " ").split()
-            if t.strip()
-        ]
+        types_list = [t.strip() for t in instrument_types.replace(",", " ").split() if t.strip()]
     else:
         types_list = list(instrument_types)
     if include_futures:
@@ -204,7 +204,9 @@ def discover_option_contracts(
 
     logger.info(
         "Discovering option contracts: stock_types=%s, index_types=%s, index=%s",
-        stock_types, index_types, index_name,
+        stock_types,
+        index_types,
+        index_name,
     )
 
     df = download_instruments()
@@ -218,17 +220,13 @@ def discover_option_contracts(
             from nse_relative.infrastructure.symbol_source.nse_index_csv import (
                 NseIndexConstituents,
             )
+
             idx = NseIndexConstituents()
             isin_set = idx.get_isin_set(index_name)
-            eq_df = df[
-                (df["exchange"] == "NSE_EQ")
-                & (df["ISIN_NUMBER"].isin(isin_set))
-            ]
+            eq_df = df[(df["exchange"] == "NSE_EQ") & (df["ISIN_NUMBER"].isin(isin_set))]
             underlying_names = set(eq_df["name"].dropna().str.strip().unique())
             if underlying_names:
-                matched = stock_fno[
-                    stock_fno["name"].str.strip().isin(underlying_names)
-                ].copy()
+                matched = stock_fno[stock_fno["name"].str.strip().isin(underlying_names)].copy()
                 matched["underlying_type"] = "STOCK"
                 all_parts.append(matched)
 
@@ -238,12 +236,8 @@ def discover_option_contracts(
         if not index_fno.empty:
             configured = settings.upstox_options_index_names.strip()
             if configured:
-                allowed_names = {
-                    n.strip() for n in configured.split(",") if n.strip()
-                }
-                matched = index_fno[
-                    index_fno["name"].str.strip().isin(allowed_names)
-                ].copy()
+                allowed_names = {n.strip() for n in configured.split(",") if n.strip()}
+                matched = index_fno[index_fno["name"].str.strip().isin(allowed_names)].copy()
             else:
                 matched = index_fno.copy()
             matched["underlying_type"] = "INDEX"
@@ -286,7 +280,6 @@ def filter_by_expiry(
     df = contracts_df.copy()
 
     # Ensure expiry is a date column
-    from datetime import date as date_type
 
     if not isinstance(df[expiry_date_col].iloc[0], date_type):
         df[expiry_date_col] = pd.to_datetime(df[expiry_date_col]).dt.date
@@ -307,13 +300,14 @@ def filter_by_expiry(
         parts.append(group[group[expiry_date_col].isin(keep_expiries)])
 
     result = pd.concat(parts, ignore_index=True)
-    result = result.sort_values(
-        [group_by_col, expiry_date_col, "strike", "option_type"]
-    )
+    result = result.sort_values([group_by_col, expiry_date_col, "strike", "option_type"])
     result.reset_index(drop=True, inplace=True)
 
     logger.info(
         "Expiry filter: %d -> %d contracts (next %d expiry(ies) per %d underlyings)",
-        len(contracts_df), len(result), n_expiries, result[group_by_col].nunique(),
+        len(contracts_df),
+        len(result),
+        n_expiries,
+        result[group_by_col].nunique(),
     )
     return result

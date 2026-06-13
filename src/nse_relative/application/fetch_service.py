@@ -7,16 +7,11 @@ fetch logic without needing to construct provider objects directly.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
-
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
-from nse_relative.domain.models import CandleInterval, ProviderName
-from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
-from nse_relative.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
+from nse_relative.config.settings import settings
 from nse_relative.infrastructure.api.nse_client import NseClient
 from nse_relative.infrastructure.api.upstox_client import UpstoxClient
+from nse_relative.infrastructure.storage.file_repository import FileStorageRepository
 from nse_relative.pipeline.base import DataProvider
 
 logger = get_logger(__name__)

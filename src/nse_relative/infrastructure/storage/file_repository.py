@@ -30,12 +30,11 @@ from __future__ import annotations
 import glob
 import os
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
-from nse_relative.config.settings import settings
 from nse_relative.config.logger import get_logger
+from nse_relative.config.settings import settings
 
 logger = get_logger(__name__)
 
@@ -78,18 +77,14 @@ class FileStorageRepository:
         if self._storage_format == "csv":
             return lambda p: pd.read_csv(
                 p,
-                parse_dates=["Date"]
-                if "Date" in pd.read_csv(p, nrows=0).columns
-                else False,
+                parse_dates=["Date"] if "Date" in pd.read_csv(p, nrows=0).columns else False,
             )
         return lambda p: pd.read_parquet(p, engine="fastparquet")
 
     def _write_func(self):
         if self._storage_format == "csv":
             return lambda df, p: df.to_csv(p, index=False)
-        return lambda df, p: df.to_parquet(
-            p, index=False, compression="gzip", engine="fastparquet"
-        )
+        return lambda df, p: df.to_parquet(p, index=False, compression="gzip", engine="fastparquet")
 
     # ------------------------------------------------------------------
     # Base path resolver
@@ -106,7 +101,7 @@ class FileStorageRepository:
     # Path builders
     # ------------------------------------------------------------------
 
-    def equities_path(self, provider: str, year: Optional[int] = None) -> Path:
+    def equities_path(self, provider: str, year: int | None = None) -> Path:
         """Path to an equities file."""
         base = self.base_dir(provider)
         ext = self._ext()
@@ -120,10 +115,6 @@ class FileStorageRepository:
 
     def symbol_path(self, provider: str, symbol: str) -> Path:
         """Path to an individual symbol file."""
-        return self.base_dir(provider) / f"{symbol}{self._ext()}"
-
-    def options_path(self, provider: str, symbol: str) -> Path:
-        """Path to an individual option contract file."""
         return self.base_dir(provider) / f"{symbol}{self._ext()}"
 
     def checkpoint_path(self, provider: str) -> Path:
@@ -150,9 +141,9 @@ class FileStorageRepository:
             if path.exists():
                 existing = self._read_func()(path)
                 group = pd.concat([existing, group], ignore_index=True)
-                group = group.drop_duplicates(
-                    subset=["Symbol", "Date"], keep="last"
-                ).sort_values("Date")
+                group = group.drop_duplicates(subset=["Symbol", "Date"], keep="last").sort_values(
+                    "Date"
+                )
             group.drop(columns=["Year"], inplace=True)
             self._write_func()(group, path)
 
@@ -186,9 +177,7 @@ class FileStorageRepository:
 
     def load_equities_yearly(self, provider: str) -> pd.DataFrame:
         """Load all yearly partitions as a single DataFrame."""
-        files = sorted(
-            glob.glob(os.path.join(self.base_dir(provider), f"equities_*{self._ext()}"))
-        )
+        files = sorted(glob.glob(os.path.join(self.base_dir(provider), f"equities_*{self._ext()}")))
         if not files:
             return pd.DataFrame()
         dfs = [self._read_func()(f) for f in files]
@@ -254,7 +243,8 @@ class FileStorageRepository:
         Returns the leading alpha characters (e.g. ``'WIPRO'``, ``'NIFTY'``).
         """
         import re
-        m = re.match(r'^([A-Za-z]+)', symbol)
+
+        m = re.match(r"^([A-Za-z]+)", symbol)
         return m.group(1).upper() if m else ""
 
     @staticmethod
@@ -273,18 +263,21 @@ class FileStorageRepository:
         Returns ``('', '')`` if no format matches.
         """
         import re
+
         # Try stock format: leading alphas + 2-digit year + 3-letter month
-        m = re.match(r'^([A-Za-z]+)(\d{2}[A-Za-z]{3})', symbol)
+        m = re.match(r"^([A-Za-z]+)(\d{2}[A-Za-z]{3})", symbol)
         if m:
             return m.group(1).upper(), m.group(2).upper()
         # Try index format: leading alphas + 6 digits (YYMMDD)
-        m = re.match(r'^([A-Za-z]+)(\d{2}(?:0[1-9]|1[012])(?:0[1-9]|[12]\d|3[01]))', symbol)
+        m = re.match(r"^([A-Za-z]+)(\d{2}(?:0[1-9]|1[012])(?:0[1-9]|[12]\d|3[01]))", symbol)
         if m:
             return m.group(1).upper(), m.group(2)
         return "", ""
 
     def options_path(
-        self, provider: str, symbol: str,
+        self,
+        provider: str,
+        symbol: str,
         underlying: str | None = None,
         expiry_date: str | None = None,
     ) -> Path:
@@ -318,7 +311,10 @@ class FileStorageRepository:
         return base / name / exp_folder / f"{symbol}{ext}"
 
     def save_option(
-        self, df: pd.DataFrame, provider: str, symbol: str,
+        self,
+        df: pd.DataFrame,
+        provider: str,
+        symbol: str,
         underlying: str | None = None,
         expiry_date: str | None = None,
     ) -> None:
@@ -334,7 +330,8 @@ class FileStorageRepository:
         if df.empty:
             return
         path = self.options_path(
-            provider, symbol,
+            provider,
+            symbol,
             underlying=underlying,
             expiry_date=expiry_date,
         )
@@ -342,13 +339,16 @@ class FileStorageRepository:
         self._write_func()(df, path)
 
     def load_option(
-        self, provider: str, symbol: str,
+        self,
+        provider: str,
+        symbol: str,
         underlying: str | None = None,
         expiry_date: str | None = None,
     ) -> pd.DataFrame:
         """Load candle data for a single contract."""
         path = self.options_path(
-            provider, symbol,
+            provider,
+            symbol,
             underlying=underlying,
             expiry_date=expiry_date,
         )

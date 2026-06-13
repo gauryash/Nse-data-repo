@@ -9,8 +9,7 @@ easy to add S3, GCS, or in-memory variants for testing.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
 
 import pandas as pd
 

@@ -133,7 +133,8 @@ class UpstoxProvider(DataProvider):
         symboldf = upstox_src.load_equity_symbols(index_name=self._index)
         if symboldf.empty:
             logger.error(
-                "Upstox symbol list is empty. Run 'nse-relative fetch --provider upstox' first."
+                "Upstox symbol list is empty. Run 'nse-data-pipeline fetch"
+                " --provider upstox' first."
             )
             return
 
@@ -173,10 +174,6 @@ class UpstoxProvider(DataProvider):
                     logger.error("%s fetch error: %s", symbol, e)
 
         logger.info("Upstox fetch complete.")
-
-    def fetch_index(self) -> None:
-        """Upstox does not provide index data."""
-        logger.info("Upstox: index fetching not implemented — skip.")
 
     # ------------------------------------------------------------------
     # Introspection

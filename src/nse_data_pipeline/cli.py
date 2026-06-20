@@ -3,9 +3,9 @@ Unified command-line interface for the NSE/Upstox data pipeline.
 
 Commands::
 
-    nse-relative fetch              Fetch data from NSE or Upstox
-    nse-relative list-providers     List available data providers
-    nse-relative list-indices       List available NSE index constituent lists
+    nse-data-pipeline fetch              Fetch data from NSE or Upstox
+    nse-data-pipeline list-providers     List available data providers
+    nse-data-pipeline list-indices       List available NSE index constituent lists
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ VALID_PROVIDERS = ("nse", "upstox", "upstox_options")
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="nse-relative",
+        prog="nse-data-pipeline",
         description="NSE / Upstox data pipeline — fetch equities, index, and F&O data.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")

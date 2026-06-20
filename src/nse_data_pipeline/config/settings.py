@@ -24,6 +24,11 @@ except ImportError:
 
 # ---------------------------------------------------------------------------
 # Enums
+#
+# StorageFormat, CandleInterval, and ProviderName intentionally duplicate
+# the same enums in domain/models.py.  Settings must not import from the
+# domain layer to avoid circular imports (many domain utilities read
+# settings).  Keep the two copies in sync when adding new values.
 # ---------------------------------------------------------------------------
 
 
@@ -187,57 +192,6 @@ class Settings:
 # ---------------------------------------------------------------------------
 
 settings = Settings.from_env()
-
-
-# --- Keep backward-compatible aliases for smooth migration ---
-def _sync_legacy_aliases() -> None:
-    """Patch module-level names so old ``from settings import X`` still works.
-
-    This allows incremental migration: old code can import ``settings.BASE_URL``
-    while new code uses ``settings.nse_base_url``.
-    """
-    import sys
-
-    this = sys.modules[__name__]
-    mapping = {
-        "BASE_URL": settings.nse_base_url,
-        "INDEX_HISTORICAL_URL": settings.nse_index_url,
-        "NIFTY_BENCHMARK": settings.nse_benchmark,
-        "NSE_STORAGE_DIR": settings.nse_storage_dir,
-        "DATA_DIR": settings.data_dir,
-        "UPSTOX_BASE_URL": settings.upstox_base_url,
-        "UPSTOX_INSTRUMENTS_URL": settings.upstox_instruments_url,
-        "UPSTOX_STORAGE_DIR": settings.upstox_storage_dir,
-        "UPSTOX_OPTIONS_STORAGE_DIR": settings.upstox_options_storage_dir,
-        "RATE_MAX_WORKERS": settings.nse_rate_max_workers,
-        "RATE_INITIAL_DELAY": settings.rate_initial_delay,
-        "RATE_MAX_DELAY": settings.rate_max_delay,
-        "RATE_BACKOFF_FACTOR": settings.rate_backoff_factor,
-        "FETCH_START_DATE": settings.nse_fetch_start,
-        "FETCH_END_DATE": settings.nse_fetch_end,
-        "FETCH_CHUNK_DAYS": settings.nse_fetch_chunk_days,
-        "FETCH_MAX_RETRIES": settings.nse_fetch_max_retries,
-        "FETCH_SLEEP_INTERVAL": settings.nse_fetch_sleep,
-        "FETCH_STORAGE_FORMAT": settings.nse_storage_format.value,
-        "UPSTOX_INTERVAL": settings.upstox_interval.value,
-        "UPSTOX_MAX_WORKERS": settings.upstox_max_workers,
-        "UPSTOX_CHUNK_YEARS": settings.upstox_chunk_years,
-        "UPSTOX_FETCH_START": settings.upstox_fetch_start,
-        "UPSTOX_OPTIONS_INTERVAL": settings.upstox_options_interval.value,
-        "UPSTOX_OPTIONS_MAX_WORKERS": settings.upstox_options_max_workers,
-        "UPSTOX_OPTIONS_CHUNK_YEARS": settings.upstox_options_chunk_years,
-        "UPSTOX_OPTIONS_FETCH_START": settings.upstox_options_fetch_start,
-        "UPSTOX_OPTIONS_TYPES": settings.upstox_options_types,
-        "UPSTOX_OPTIONS_N_EXPIRIES": settings.upstox_options_n_expiries,
-        "UPSTOX_OPTIONS_INDEX_NAMES": settings.upstox_options_index_names,
-        "LOG_LEVEL": settings.log_level,
-        "VALID_PROVIDERS": ("nse", "upstox", "upstox_options"),
-    }
-    for name, value in mapping.items():
-        setattr(this, name, value)
-
-
-_sync_legacy_aliases()
 
 
 def ensure_dirs() -> None:

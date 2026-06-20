@@ -16,6 +16,10 @@ import pandas as pd
 
 # ======================================================================
 # Enums
+#
+# StorageFormat, CandleInterval, and ProviderName are intentionally
+# duplicated from config/settings.py.  Domain enums carry extra methods
+# (from_str, from_instrument_type) not needed by the config layer.
 # ======================================================================
 
 

@@ -3,7 +3,7 @@ requires = ["hatchling>=1.21.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "nse-relative"
+name = "nse-data-pipeline"
 version = "0.3.0"
 description = "NSE / Upstox data pipeline — fetch equities, index, and F&O data"
 readme = "README.md"
@@ -45,12 +45,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/nse-relative"
-Repository = "https://github.com/yourusername/nse-relative.git"
-Issues = "https://github.com/yourusername/nse-relative/issues"
+Homepage = "https://github.com/yourusername/nse-data-pipeline"
+Repository = "https://github.com/yourusername/nse-data-pipeline.git"
+Issues = "https://github.com/yourusername/nse-data-pipeline/issues"
 
 [project.scripts]
-nse-relative = "nse_data_pipeline.cli:main"
+nse-data-pipeline = "nse_data_pipeline.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nse_data_pipeline"]

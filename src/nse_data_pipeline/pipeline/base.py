@@ -33,13 +33,21 @@ class DataProvider(ABC):
     # Fetch methods
     # ------------------------------------------------------------------
 
-    @abstractmethod
-    def fetch_equities(self, symbols: list[str] | None = None) -> None:
-        """Fetch daily / periodic equity data and persist to storage."""
+    def fetch_equities(self, _symbols: list[str] | None = None) -> None:
+        """Fetch daily / periodic equity data and persist to storage.
 
-    @abstractmethod
+        Base implementation logs a skip message. Providers that support
+        equities override this method.
+        """
+        logger.info("%s: equity fetching not applicable — skip.", self.name)
+
     def fetch_index(self) -> None:
-        """Fetch index / benchmark data (if available) and persist."""
+        """Fetch index / benchmark data (if available) and persist.
+
+        Base implementation logs a skip message. Providers that support
+        index data override this method.
+        """
+        logger.info("%s: index fetching not applicable — skip.", self.name)
 
     def fetch_options(self, _symbols: list[str] | None = None) -> None:
         """Fetch historical options / F&O data and persist to storage.

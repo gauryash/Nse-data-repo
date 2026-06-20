@@ -20,7 +20,7 @@ from nse_data_pipeline.infrastructure.storage.file_repository import FileStorage
 
 logger = get_logger(__name__)
 
-# Columns stored in the manifest (must match OptionContract domain model)
+# Mirrors OptionContract._CONTRACT_COLUMNS with "underlying_name" instead of "name".
 MANIFEST_COLUMNS = [
     "instrument_key",
     "tradingsymbol",

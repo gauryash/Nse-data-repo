@@ -77,11 +77,24 @@ class StorageRepository(Protocol):
     # Per-contract (Upstox F&O style)
     # ------------------------------------------------------------------
 
-    def save_option(self, df: pd.DataFrame, provider: str, symbol: str) -> None:
+    def save_option(
+        self,
+        df: pd.DataFrame,
+        provider: str,
+        symbol: str,
+        underlying: str | None = None,
+        expiry_date: str | None = None,
+    ) -> None:
         """Save candle data for a single option/future contract."""
         ...
 
-    def load_option(self, provider: str, symbol: str) -> pd.DataFrame:
+    def load_option(
+        self,
+        provider: str,
+        symbol: str,
+        underlying: str | None = None,
+        expiry_date: str | None = None,
+    ) -> pd.DataFrame:
         """Load candle data for a single contract."""
         ...
 

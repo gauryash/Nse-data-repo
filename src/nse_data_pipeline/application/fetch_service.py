@@ -1,14 +1,8 @@
 """
 Pipeline orchestrator — builds providers and dispatches fetch requests.
-
-Uses a ProviderFactory registry pattern so adding a new data source
-only requires registering a new builder function.
 """
 
 from __future__ import annotations
-
-from collections.abc import Callable
-from typing import ClassVar
 
 from nse_data_pipeline.config.logger import get_logger
 from nse_data_pipeline.config.settings import settings
@@ -22,35 +16,11 @@ from nse_data_pipeline.pipeline.base import DataProvider
 logger = get_logger(__name__)
 
 
-class ProviderFactory:
-    """Registry of provider builders with lazy imports."""
-
-    _builders: ClassVar[dict[str, Callable[..., DataProvider]]] = {}
-
-    @classmethod
-    def register(cls, name: str) -> Callable:
-        """Decorator that registers a provider builder under *name*."""
-
-        def wrapper(builder: Callable[..., DataProvider]) -> Callable[..., DataProvider]:
-            cls._builders[name] = builder
-            return builder
-
-        return wrapper
-
-    @classmethod
-    def create(cls, name: str, **kwargs: object) -> DataProvider:
-        builder = cls._builders.get(name)
-        if builder is None:
-            msg = f"Unknown provider '{name}'. Known: {list(cls._builders)}"
-            raise ValueError(msg)
-        return builder(**kwargs)
-
-
 class PipelineOrchestrator:
     """Central fetch orchestrator.
 
-    Constructs the appropriate provider via *ProviderFactory* and
-    dispatches the right fetch method based on provider type.
+    Builds the appropriate provider and dispatches the right fetch
+    method based on provider type.
     """
 
     def __init__(self) -> None:
@@ -59,7 +29,7 @@ class PipelineOrchestrator:
         self._upstox_client = UpstoxClient()
 
     # ------------------------------------------------------------------
-    # Provider construction via factory
+    # Provider construction
     # ------------------------------------------------------------------
 
     def fetch(

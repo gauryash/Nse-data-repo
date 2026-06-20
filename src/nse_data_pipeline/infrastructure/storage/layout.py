@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from nse_data_pipeline.config.settings import settings
+from nse_data_pipeline.infrastructure.storage.symbol_parser import FnoSymbolParser
 
 
 class ProviderLayout:
@@ -88,10 +89,6 @@ class ProviderLayout:
         base = self.for_provider(provider)
         name = underlying or ""
         if not name:
-            from nse_data_pipeline.infrastructure.storage.symbol_parser import (
-                FnoSymbolParser,
-            )
-
             name = FnoSymbolParser.extract_underlying(symbol)
         if not name:
             return base / f"{symbol}{self.ext}"
@@ -104,16 +101,8 @@ class ProviderLayout:
                 dt = pd.to_datetime(expiry_date)
                 exp_folder = dt.strftime("%y%m%d")
             except Exception:
-                from nse_data_pipeline.infrastructure.storage.symbol_parser import (
-                    FnoSymbolParser,
-                )
-
                 _, exp_folder = FnoSymbolParser.parse(symbol)
         else:
-            from nse_data_pipeline.infrastructure.storage.symbol_parser import (
-                FnoSymbolParser,
-            )
-
             _, exp_folder = FnoSymbolParser.parse(symbol)
 
         if not exp_folder:

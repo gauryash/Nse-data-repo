@@ -1,6 +1,6 @@
 # NSE Data Pipeline
 
-**Multi-source pipeline for Indian financial market data -- Equities, Options & Futures**
+Multi-source pipeline for Indian financial market data -- equities, options, and futures.
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -10,9 +10,7 @@
 
 ## Overview
 
-Fetches historical market data from **two sources** and stores it in Parquet
-format for analysis.  The pipeline is organized around a clean class hierarchy
-with dependency injection, making it extensible to new data sources.
+Fetches historical market data from two sources and stores it in Parquet format for analysis. The pipeline is organized around a clean class hierarchy with dependency injection, making it extensible to new data sources.
 
 | Source | Equities | Stock Options | Index Options | Futures | Index |
 |--------|----------|---------------|---------------|---------|-------|
@@ -21,12 +19,12 @@ with dependency injection, making it extensible to new data sources.
 
 ### Capabilities
 
-- **NSE Equity data** -- 20+ index constituent lists (Nifty 50, 500, etc.)
-- **Upstox Equity data** -- ISIN-filtered against any NSE index
-- **Options chain** -- Full strike/expiry discovery for stock + index options
-- **Expiry-aware filtering** -- Per-underlying, keeps next N expiries (all strikes)
+- **NSE equity data** -- 20+ index constituent lists (Nifty 50, 500, etc.)
+- **Upstox equity data** -- ISIN-filtered against any NSE index
+- **Options chain** -- Full strike/expiry discovery for stock and index options
+- **Expiry-aware filtering** -- Per-underlying, keeps next N expiries with all strikes
 - **Incremental fetch** -- Per-symbol checkpoint avoids re-downloads
-- **Contract manifest** -- `_contracts.parquet` enables expiry-based queries
+- **Contract manifest** -- Parquet catalog enables expiry-based queries
 - **Parallel downloads** -- ThreadPoolExecutor with rate limiting
 
 ---
@@ -56,6 +54,8 @@ PipelineOrchestrator
         +-- Symbol Sources    (NseIndexConstituents,
                                InstrumentMaster, OptionDiscoverer)
 ```
+
+Data flow:
 
 ```
                      Upstox API                  NSE Website
@@ -110,29 +110,31 @@ source venv/bin/activate    # or venv\Scripts\activate on Windows
 pip install -e ".[dev]"
 ```
 
-### Your first fetch
+### First fetch
 
 ```bash
 # Fetch Nifty 50 equities from NSE
-nse-relative fetch --provider nse --index nifty50
+nse-data-pipeline fetch --provider nse --index nifty50
 
 # Fetch Upstox equity data (Nifty 200, monthly candles)
-nse-relative fetch --provider upstox --index nifty200 --interval month
+nse-data-pipeline fetch --provider upstox --index nifty200 --interval month
 
 # Stock options for Nifty 50 constituents (default: 2 expiries)
-nse-relative fetch --provider upstox_options --index nifty50
+nse-data-pipeline fetch --provider upstox_options --index nifty50
 
 # Index options only (NIFTY, BANKNIFTY, FINNIFTY, etc.)
-nse-relative fetch --provider upstox_options --instrument-types OPTIDX
+nse-data-pipeline fetch --provider upstox_options --instrument-types OPTIDX
 ```
-
-See the full reference below or `nse-relative fetch --help` for all options.
 
 ---
 
 ## CLI Reference
 
-### `nse-relative fetch`
+### `fetch` -- Fetch market data
+
+```
+nse-data-pipeline fetch [options]
+```
 
 | Flag | Alias | Type | Default | Description |
 |------|-------|------|---------|-------------|
@@ -151,13 +153,26 @@ See the full reference below or `nse-relative fetch --help` for all options.
 
 ### Other commands
 
-- `nse-relative list-providers` -- Show available data sources
-- `nse-relative list-indices` -- Show available NSE index constituent lists
-- `nse-relative --version` -- Show version
+- `nse-data-pipeline list-providers` -- Show available data sources
+- `nse-data-pipeline list-indices` -- Show available NSE index constituent lists
+- `nse-data-pipeline --version` -- Show version
+
+### Provider comparison
+
+| Feature | NSE | Upstox | UpstoxOptions |
+|---------|-----|--------|---------------|
+| Equities | Daily OHLCV | Day/Week/Month | -- |
+| Index data | Nifty 500 | -- | -- |
+| Stock options | -- | -- | OPTSTK, all strikes x expiries |
+| Index options | -- | -- | OPTIDX (NIFTY, BANKNIFTY, etc.) |
+| Futures | -- | -- | FUTSTK, FUTIDX |
+| API type | Public website | Public REST (no key) | Public REST (no key) |
+| Historical range | ~20 years | ~25 years | Depends on contract |
+| Symbol source | NSE index CSVs | ISIN filter from NSE index | Instrument master discovery |
 
 ---
 
-## Options & Futures -- Deep Dive
+## Options and Futures -- Deep Dive
 
 ### Contract discovery
 
@@ -197,7 +212,7 @@ Each file (e.g. `RELIANCE26JUN1230CE.parquet`) contains:
 | `lot_size` | 100 | Lot multiplier |
 | `underlying_name` | RELIANCE | Company or index name |
 
-### Expiry filter -- behaviour
+### Expiry filter behaviour
 
 Per-underlying grouping, not a global expiry cutoff:
 
@@ -221,30 +236,25 @@ RELIANCE (stock, monthly expiry):
 
 ```bash
 # Stock options only (Nifty 50 constituents, 2 expiries)
-nse-relative fetch --provider upstox_options --index nifty50
+nse-data-pipeline fetch --provider upstox_options --index nifty50
 
 # Index options only
-nse-relative fetch --provider upstox_options --instrument-types OPTIDX
+nse-data-pipeline fetch --provider upstox_options --instrument-types OPTIDX
 
 # Combined: stock + index options + futures
-nse-relative fetch --provider upstox_options --index nifty50 \
+nse-data-pipeline fetch --provider upstox_options --index nifty50 \
   --instrument-types "OPTSTK,OPTIDX" --include-futures
 
 # Disable expiry filter (get everything available)
-nse-relative fetch --provider upstox_options --index nifty50 \
+nse-data-pipeline fetch --provider upstox_options --index nifty50 \
   --n-expiries 0
 
-# Next 3 expiries per underlying
-nse-relative fetch --provider upstox_options --index nifty50 \
-  --n-expiries 3
+# Single stock options
+nse-data-pipeline fetch --provider upstox_options --underlying RELIANCE
 
 # Specific contract tradingsymbols
-nse-relative fetch --provider upstox_options \
+nse-data-pipeline fetch --provider upstox_options \
   --symbols NIFTY26JUN23600CE NIFTY26JUN23600PE
-
-# Weekly candles
-nse-relative fetch --provider upstox_options --index nifty50 \
-  --interval week
 ```
 
 ---
@@ -263,21 +273,21 @@ data/
     _checkpoint.json
     {SYMBOL}.parquet             per-equity files (RELIANCE.parquet, ...)
 
-    upstox_options/
-      _checkpoint.json
-      _contracts.parquet         contract manifest (expiry-queryable)
-      NIFTY/
-        260609/                  expiry 2026-06-09
-          NIFTY26060923600CE.parquet
-        260630/                  expiry 2026-06-30
-          NIFTY26JUN23600CE.parquet
-      WIPRO/
-        260630/
-          WIPRO26JUN160CE.parquet
-        260731/
-          ...
-      RELIANCE/
+  upstox_options/
+    _checkpoint.json
+    _contracts.parquet           contract manifest (expiry-queryable)
+    NIFTY/
+      260609/                    expiry 2026-06-09
+        NIFTY26060923600CE.parquet
+      260630/                    expiry 2026-06-30
+        NIFTY26JUN23600CE.parquet
+    WIPRO/
+      260630/
+        WIPRO26JUN160CE.parquet
+      260731/
         ...
+    RELIANCE/
+      ...
 ```
 
 ### Querying the contract manifest
@@ -353,8 +363,7 @@ src/nse_data_pipeline/
 
 ## Configuration
 
-Copy `.env.example` -> `.env` and adjust as needed. All defaults work
-out of the box -- no API keys required.
+Copy `.env.example` -> `.env` and adjust as needed. All defaults work out of the box -- no API keys required.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -376,8 +385,7 @@ out of the box -- no API keys required.
 | `UPSTOX_OPTIONS_N_EXPIRIES` | `2` | Expiry cycles per underlying |
 | `UPSTOX_OPTIONS_INDEX_NAMES` | (auto) | Restrict index options |
 
-Rate limiter: `NSE_RATE_INITIAL_DELAY=0.5`, `NSE_RATE_MAX_DELAY=30.0`,
-`NSE_RATE_BACKOFF_FACTOR=2.0`, `NSE_FETCH_MAX_RETRIES=5`
+Rate limiter: `NSE_RATE_INITIAL_DELAY=0.5`, `NSE_RATE_MAX_DELAY=30.0`, `NSE_RATE_BACKOFF_FACTOR=2.0`, `NSE_FETCH_MAX_RETRIES=5`
 
 ---
 
@@ -398,15 +406,15 @@ ruff format src/
 mypy src/
 
 # CLI help
-nse-relative --help
-nse-relative fetch --help
+nse-data-pipeline --help
+nse-data-pipeline fetch --help
 ```
 
 ### Troubleshooting
 
 **Entry point fails after code changes:**
 ```bash
-pip uninstall nse-relative -y
+pip uninstall nse-data-pipeline -y
 pip install -e .
 ```
 

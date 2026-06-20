@@ -381,7 +381,6 @@ class ExpiryFilter:
 download_instruments = InstrumentMaster().download
 get_equity_symbols = SymbolExporter().export_equity_symbols
 load_equity_symbols = SymbolExporter().load_or_rebuild
-get_fno_symbols = FnoFilter  # kept for backward compatibility if used
 discover_option_contracts = OptionDiscoverer().discover
 filter_by_expiry = ExpiryFilter.filter_by_expiry
 discover_index_option_names = ExpiryFilter.discover_index_option_names

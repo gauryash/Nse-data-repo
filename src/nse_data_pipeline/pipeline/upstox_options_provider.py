@@ -29,6 +29,7 @@ from nse_data_pipeline.infrastructure.api.upstox_client import UpstoxClient
 from nse_data_pipeline.infrastructure.checkpoint.json_checkpoint import JsonCheckpoint
 from nse_data_pipeline.infrastructure.storage.file_repository import FileStorageRepository
 from nse_data_pipeline.infrastructure.storage.manifest import ContractManifest
+from nse_data_pipeline.infrastructure.storage.symbol_parser import FnoSymbolParser
 from nse_data_pipeline.infrastructure.symbol_source import upstox_instruments as upstox_src
 from nse_data_pipeline.infrastructure.symbol_source.nse_index_csv import DEFAULT_NSE_INDEX
 from nse_data_pipeline.pipeline.base import DataProvider
@@ -129,18 +130,6 @@ class UpstoxOptionsProvider(DataProvider):
         return _PROVIDER
 
     # ------------------------------------------------------------------
-    # Abstract method stubs
-    # ------------------------------------------------------------------
-
-    def fetch_equities(self, _symbols: list[str] | None = None) -> None:
-        """Not applicable — use ``UpstoxProvider`` for equity data."""
-        logger.info("UpstoxOptions: equity fetching not applicable — skip.")
-
-    def fetch_index(self) -> None:
-        """Not applicable — use ``NSEProvider`` for index data."""
-        logger.info("UpstoxOptions: index fetching not applicable — skip.")
-
-    # ------------------------------------------------------------------
     # Main fetch method
     # ------------------------------------------------------------------
 
@@ -183,13 +172,11 @@ class UpstoxOptionsProvider(DataProvider):
         # Filter to a single underlying stock/index (e.g. "WIPRO", "NIFTY")
         if underlying is not None and symbols is None:
             before = len(symboldf)
-            # Extract short underlying name from tradingsymbol
-            # Format: <SYMBOL><YY><MON><STRIKE><OPT> (e.g. "WIPRO26JUN2160CE")
             symboldf = symboldf.copy()
-            symboldf["_underlying_short"] = symboldf["tradingsymbol"].str.extract(
-                r"^([A-Za-z]+)", expand=False
+            symboldf["_underlying_short"] = symboldf["tradingsymbol"].apply(
+                FnoSymbolParser.extract_underlying
             )
-            matches = symboldf["_underlying_short"].str.upper() == underlying.upper()
+            matches = symboldf["_underlying_short"] == underlying.upper()
             symboldf = symboldf[matches]
             if symboldf.empty:
                 logger.warning(
@@ -231,7 +218,7 @@ class UpstoxOptionsProvider(DataProvider):
                 row = symboldf.loc[idx]
                 symbol = row["tradingsymbol"]
                 # Extract short underlying name from tradingsymbol for folder structure
-                underlying_short = FileStorageRepository._parse_fno_underlying(symbol)
+                underlying_short = FnoSymbolParser.extract_underlying(symbol)
                 # Get expiry date from row metadata
                 expiry_val = row.get("expiry")
                 expiry_date_str = str(expiry_val) if pd.notna(expiry_val) else None

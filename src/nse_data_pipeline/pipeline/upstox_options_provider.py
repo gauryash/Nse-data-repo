@@ -138,6 +138,7 @@ class UpstoxOptionsProvider(DataProvider):
         symbols: list[str] | None = None,
         n_expiries: int | None = None,
         underlying: str | None = None,
+        underlyings: list[str] | None = None,
     ) -> None:
         """Fetch historical candle data for F&O contracts and persist.
 
@@ -147,6 +148,10 @@ class UpstoxOptionsProvider(DataProvider):
             underlying: Single underlying stock/index name to restrict to
                         (e.g. "WIPRO", "NIFTY"). Filters on the ``name``
                         column of the contract discovery DataFrame.
+            underlyings: Multiple underlying names to restrict to
+                        (OPTSTK only). Takes precedence over ``underlying``.
+                        Matches against the tradingsymbol's leading alpha
+                        characters.
         """
         effective_n = self._n_expiries if n_expiries is None else n_expiries
 
@@ -169,8 +174,13 @@ class UpstoxOptionsProvider(DataProvider):
             )
             return
 
+        # Filter to a list of underlying names (takes precedence over single)
+        if underlyings is not None and symbols is None:
+            symboldf = self._filter_by_underlyings(symboldf, underlyings)
+            if symboldf.empty:
+                return
         # Filter to a single underlying stock/index (e.g. "WIPRO", "NIFTY")
-        if underlying is not None and symbols is None:
+        elif underlying is not None and symbols is None:
             before = len(symboldf)
             symboldf = symboldf.copy()
             symboldf["_underlying_short"] = symboldf["tradingsymbol"].apply(
@@ -252,6 +262,73 @@ class UpstoxOptionsProvider(DataProvider):
             logger.info("Contract manifest updated (%d contracts)", len(symboldf))
 
         logger.info("UpstoxOptions fetch complete.")
+
+    # ------------------------------------------------------------------
+    # Filtering helpers
+    # ------------------------------------------------------------------
+
+    def _filter_by_underlyings(
+        self,
+        symboldf: pd.DataFrame,
+        underlyings: list[str],
+    ) -> pd.DataFrame:
+        """Restrict ``symboldf`` to contracts whose underlying short name
+        is in the given list.
+
+        The filter is applied **only to OPTSTK (and FUTSTK)** rows. Index
+        options (OPTIDX) and index futures (FUTIDX) are preserved as-is,
+        so a single fetch command can combine a stock-options subset
+        with the full index-options universe.
+        """
+        targets = {u.strip().upper() for u in underlyings if u and u.strip()}
+        before = len(symboldf)
+        if not targets:
+            logger.warning("underlyings list is empty after normalization")
+            return symboldf.iloc[0:0].copy()
+        if symboldf.empty:
+            return symboldf
+
+        is_stock_type = symboldf["instrument_type"].isin({"OPTSTK", "FUTSTK"})
+        stock_part = symboldf[is_stock_type].copy()
+        index_part = symboldf[~is_stock_type].copy()
+
+        if stock_part.empty:
+            logger.info(
+                "Underlyings filter %s: no OPTSTK/FUTSTK rows to filter (preserving %d index rows)",
+                sorted(targets),
+                len(index_part),
+            )
+            return symboldf.reset_index(drop=True)
+
+        stock_part["_underlying_short"] = stock_part["tradingsymbol"].apply(
+            FnoSymbolParser.extract_underlying
+        )
+        kept_stocks = stock_part[stock_part["_underlying_short"].isin(targets)]
+        missing = targets - set(kept_stocks["_underlying_short"].unique())
+        if missing:
+            logger.warning("Underlyings with no OPTSTK/FUTSTK contracts: %s", sorted(missing))
+        logger.info(
+            "Underlyings filter %s: OPTSTK/FUTSTK %d -> %d, "
+            "OPTIDX/FUTIDX preserved: %d (total %d -> %d)",
+            sorted(targets),
+            len(stock_part),
+            len(kept_stocks),
+            len(index_part),
+            before,
+            len(kept_stocks) + len(index_part),
+        )
+        out = pd.concat([kept_stocks, index_part], ignore_index=True)
+        return out
+        missing = targets - set(out["_underlying_short"].unique())
+        if missing:
+            logger.warning("Underlyings with no contracts: %s", sorted(missing))
+        logger.info(
+            "Underlyings filter %s: %d -> %d contracts",
+            sorted(targets),
+            before,
+            len(out),
+        )
+        return out
 
     # ------------------------------------------------------------------
     # Data fetching

@@ -105,7 +105,12 @@ git clone <repo-url>
 cd nse-data-repo
 
 python -m venv venv
-source venv/bin/activate    # or venv\Scripts\activate on Windows
+# Linux / macOS
+source venv/bin/activate
+# Git Bash on Windows
+source venv/Scripts/activate
+# Windows CMD / PowerShell
+# venv\Scripts\activate
 
 pip install -e ".[dev]"
 ```
@@ -141,6 +146,7 @@ nse-data-pipeline fetch [options]
 | `--provider` | `-p` | `nse`, `upstox`, `upstox_options` | `nse` | Data source |
 | `--index` | `-x` | string | `nifty500` | NSE index for symbol sourcing |
 | `--underlying` | | string | -- | Single stock/index for F&O (e.g. WIPRO, NIFTY) |
+| `--underlyings` | | string[] | -- | Multiple underlyings for OPTSTK/FUTSTK F&O (OPTIDX/FUTIDX are preserved; takes precedence over `--underlying`) |
 | `--symbols` | `-s` | string[] | -- | Specific symbols to fetch |
 | `--start` / `--from` | | DD-MM-YYYY | env default | Fetch start date |
 | `--end` / `--to` | | DD-MM-YYYY | env / today | Fetch end date |
@@ -255,6 +261,38 @@ nse-data-pipeline fetch --provider upstox_options --underlying RELIANCE
 # Specific contract tradingsymbols
 nse-data-pipeline fetch --provider upstox_options \
   --symbols NIFTY26JUN23600CE NIFTY26JUN23600PE
+```
+
+### Recipe: 10 stocks + NIFTY/BANKNIFTY, 3 expiries, 1-month history
+
+Restrict index options in `.env` first (auto-discovered otherwise):
+
+```env
+UPSTOX_OPTIONS_INDEX_NAMES=NIFTY,BANKNIFTY
+```
+
+Clear the options checkpoint so the 1-month pull is clean:
+
+```bash
+rm -f data/upstox_options/_checkpoint.json
+```
+
+Single command for 10 Nifty 50 stock options + NIFTY & BANKNIFTY index
+options, 3 upcoming expiries, last 30 days:
+
+> `--underlyings` filters **OPTSTK/FUTSTK** rows only. Index options
+> (OPTIDX/FUTIDX) are preserved as-is, governed by `--instrument-types`
+> and `UPSTOX_OPTIONS_INDEX_NAMES`.
+
+```bash
+nse-data-pipeline fetch \
+  --provider upstox_options \
+  --instrument-types "OPTSTK,OPTIDX" \
+  --underlyings RELIANCE TCS HDFCBANK INFY ICICIBANK SBIN BHARTIARTL LT ITC AXISBANK \
+  --n-expiries 3 \
+  --interval day \
+  --start 25-05-2026 \
+  --end 24-06-2026
 ```
 
 ---

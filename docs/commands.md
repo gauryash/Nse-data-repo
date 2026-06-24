@@ -27,6 +27,7 @@ nse-data-pipeline fetch [options]
 | `--provider` | `-p` | `nse` / `upstox` / `upstox_options` | `nse` | Data source |
 | `--index` | `-x` | *one of 21 NSE indices* | `nifty500` | NSE index for symbol sourcing |
 | `--underlying` | — | string | *(none)* | Single stock/index name for F&O (e.g. WIPRO, NIFTY, RELIANCE) |
+| `--underlyings` | — | space-separated list | *(none)* | Multiple underlyings for OPTSTK/FUTSTK F&O (OPTIDX/FUTIDX are preserved; takes precedence over `--underlying`) |
 | `--symbols` | `-s` | space-separated list | *(all)* | Restrict to specific symbols |
 | `--start` / `--from` | — | `DD-MM-YYYY` | env default | Fetch start date |
 | `--end` / `--to` | — | `DD-MM-YYYY` | env / today | Fetch end date |
@@ -175,6 +176,44 @@ nse-data-pipeline fetch --provider upstox_options --underlying WIPRO \
 nse-data-pipeline fetch --provider upstox_options --underlying NIFTY \
   --instrument-types OPTIDX
 ```
+
+#### Multiple Underlyings (`--underlyings`)
+
+Restrict OPTSTK discovery to **multiple** underlying names in a single
+command. Takes precedence over `--underlying` and matches against the
+leading alpha characters of each tradingsymbol
+(e.g. `WIPRO26JUN160CE` → `WIPRO`). Names are case-insensitive.
+
+```bash
+# 5 specific stocks, 3 expiries each
+nse-data-pipeline fetch --provider upstox_options \
+  --underlyings RELIANCE TCS HDFCBANK INFY WIPRO \
+  --n-expiries 3
+
+# Recipe: 10 Nifty 50 stock options + NIFTY & BANKNIFTY index options,
+# 3 upcoming expiries, last 30 days
+# 1) Restrict OPTIDX in .env (otherwise all indices in the master are fetched)
+#    UPSTOX_OPTIONS_INDEX_NAMES=NIFTY,BANKNIFTY
+# 2) Clear checkpoint so the 1-month window is fully fetched
+#    rm -f data/upstox_options/_checkpoint.json
+# 3) Run
+nse-data-pipeline fetch \
+  --provider upstox_options \
+  --instrument-types "OPTSTK,OPTIDX" \
+  --underlyings RELIANCE TCS HDFCBANK INFY ICICIBANK SBIN BHARTIARTL LT ITC AXISBANK \
+  --n-expiries 3 \
+  --interval day \
+  --start 25-05-2026 \
+  --end 24-06-2026
+```
+
+Notes:
+
+- `--underlyings` filters **OPTSTK/FUTSTK** rows only. Index options
+  (OPTIDX) and index futures (FUTIDX) are preserved as-is, governed by
+  `--instrument-types` and `UPSTOX_OPTIONS_INDEX_NAMES`.
+- A name with no matching OPTSTK contracts is logged as a warning — the
+  run continues for the rest.
 
 #### Index Options
 
@@ -355,6 +394,22 @@ nse-data-pipeline fetch -p upstox_options --underlying RELIANCE --n-expiries 0
 nse-data-pipeline fetch -p upstox_options --underlying NIFTY -t OPTIDX
 
 # ═══════════════════════════════════════════════════════════
+# MULTI-UNDERLYING F&O (--underlyings)
+# ═══════════════════════════════════════════════════════════
+
+# 5 specific stocks, 3 expiries
+nse-data-pipeline fetch -p upstox_options \
+  --underlyings RELIANCE TCS HDFCBANK INFY WIPRO --n-expiries 3
+
+# 10 Nifty 50 stocks + NIFTY & BANKNIFTY, 3 expiries, last 30 days
+# (assumes UPSTOX_OPTIONS_INDEX_NAMES=NIFTY,BANKNIFTY in .env)
+nse-data-pipeline fetch -p upstox_options \
+  -t "OPTSTK,OPTIDX" \
+  --underlyings RELIANCE TCS HDFCBANK INFY ICICIBANK SBIN BHARTIARTL LT ITC AXISBANK \
+  --n-expiries 3 -i day \
+  --start 25-05-2026 --end 24-06-2026
+
+# ═══════════════════════════════════════════════════════════
 # SPECIFIC SYMBOLS
 # ═══════════════════════════════════════════════════════════
 
@@ -387,11 +442,14 @@ nse-data-pipeline fetch -p upstox_options -i day
 The venv isn't activated or the package isn't installed:
 
 ```bash
-# Activate venv (Windows)
+# Git Bash (Windows)
+source venv/Scripts/activate
+
+# Windows CMD / PowerShell
 venv\Scripts\activate
 
-# Install
-pip install -e .
+# Install (editable, includes dev deps)
+pip install -e ".[dev]"
 ```
 
 ### `ModuleNotFoundError: No module named 'nse_data_pipeline.presentation'`

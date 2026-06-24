@@ -62,6 +62,14 @@ def build_parser() -> argparse.ArgumentParser:
         "(e.g. WIPRO, NIFTY, RELIANCE); filters contract discovery",
     )
     fetch_parser.add_argument(
+        "--underlyings",
+        nargs="*",
+        default=None,
+        help="Multiple underlying names for F&O fetch "
+        "(e.g. RELIANCE TCS HDFCBANK); filters contract discovery. "
+        "Takes precedence over --underlying and is OPTSTK-only.",
+    )
+    fetch_parser.add_argument(
         "--symbols",
         "-s",
         nargs="*",
@@ -139,6 +147,7 @@ def _cmd_fetch(args: argparse.Namespace) -> None:
         provider=args.provider,
         index=args.index,
         underlying=args.underlying,
+        underlyings=args.underlyings,
         symbols=args.symbols,
         start_date=args.start_date,
         end_date=args.end_date,

@@ -37,6 +37,7 @@ class PipelineOrchestrator:
         provider: str,
         index: str = "",
         underlying: str | None = None,
+        underlyings: list[str] | None = None,
         symbols: list[str] | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
@@ -53,6 +54,8 @@ class PipelineOrchestrator:
             provider: One of ``'nse'``, ``'upstox'``, ``'upstox_options'``.
             index: NSE index name for symbol sourcing.
             underlying: Single underlying name to restrict F&O fetch.
+            underlyings: Multiple underlying names to restrict F&O fetch
+                (OPTSTK only). Takes precedence over ``underlying``.
             symbols: Optional list of specific symbols to fetch.
             start_date: Fetch start (DD-MM-YYYY).
             end_date: Fetch end (DD-MM-YYYY).
@@ -101,7 +104,11 @@ class PipelineOrchestrator:
         elif provider == "upstox":
             p.fetch_equities(symbols=symbols)
         elif provider == "upstox_options":
-            p.fetch_options(symbols=symbols, underlying=underlying)
+            p.fetch_options(
+                symbols=symbols,
+                underlying=underlying,
+                underlyings=underlyings,
+            )
 
     def _build_nse_provider(
         self,

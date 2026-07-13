@@ -40,6 +40,7 @@ analysis_test/
 *.txt
 *.xlsx
 *.parquet
+!requirements*.txt
 
 # Keep directory structure
 !data/nse/.gitkeep 2>/dev/null || true
@@ -65,3 +66,7 @@ Desktop.ini
 
 # Archive (old code snapshot)
 archive/
+
+# Command Code
+.commandcode/
+

@@ -12,6 +12,7 @@ The manifest is always stored in Parquet format regardless of
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 import pandas as pd
 
@@ -150,12 +151,15 @@ class ContractManifest:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _parquet_engine() -> str:
-        """Return 'pyarrow' if available, else 'fastparquet'."""
+    def _parquet_engine() -> Literal["auto", "fastparquet"]:
+        """Return 'auto' if pyarrow is available, else 'fastparquet'.
+
+        'auto' resolves to pyarrow at runtime, so behavior is unchanged.
+        """
         try:
             import pyarrow  # noqa: F401
 
-            return "pyarrow"
+            return "auto"
         except ImportError:
             return "fastparquet"
 

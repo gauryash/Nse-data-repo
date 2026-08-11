@@ -14,6 +14,8 @@ from abc import ABC, abstractmethod
 
 from nse_data_pipeline.config.logger import get_logger
 
+# ruff: noqa: ARG002 -- interface methods; args exist for callers, unused here
+
 logger = get_logger(__name__)
 
 
@@ -33,11 +35,14 @@ class DataProvider(ABC):
     # Fetch methods
     # ------------------------------------------------------------------
 
-    def fetch_equities(self, _symbols: list[str] | None = None) -> None:
+    def fetch_equities(self, symbols: list[str] | None = None) -> None:
         """Fetch daily / periodic equity data and persist to storage.
 
         Base implementation logs a skip message. Providers that support
         equities override this method.
+
+        Args:
+            symbols: Optional list of symbols to restrict fetching.
         """
         logger.info("%s: equity fetching not applicable — skip.", self.name)
 
@@ -49,11 +54,23 @@ class DataProvider(ABC):
         """
         logger.info("%s: index fetching not applicable — skip.", self.name)
 
-    def fetch_options(self, _symbols: list[str] | None = None) -> None:
+    def fetch_options(
+        self,
+        symbols: list[str] | None = None,
+        n_expiries: int | None = None,
+        underlying: str | None = None,
+        underlyings: list[str] | None = None,
+    ) -> None:
         """Fetch historical options / F&O data and persist to storage.
 
         Base implementation logs a skip message. Providers that support
         options override this method.
+
+        Args:
+            symbols: Optional list of tradingsymbols to restrict fetching.
+            n_expiries: Override number of upcoming expiry cycles.
+            underlying: Single underlying name to restrict to.
+            underlyings: Multiple underlying names to restrict to.
         """
         logger.info("%s: options fetching not implemented — skip.", self.name)
 

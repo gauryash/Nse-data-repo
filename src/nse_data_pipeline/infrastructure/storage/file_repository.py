@@ -10,6 +10,7 @@ from __future__ import annotations
 import glob
 import os
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -49,7 +50,7 @@ class FileStorageRepository:
 
         df["Year"] = pd.to_datetime(df["Date"]).dt.year
         for year, group in df.groupby("Year"):
-            path = self._layout.equities(provider, int(year))
+            path = self._layout.equities(provider, cast(int, year))
             if path.exists():
                 existing = self._format.read(path)
                 group = pd.concat([existing, group], ignore_index=True)

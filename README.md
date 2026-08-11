@@ -26,33 +26,43 @@ Fetches historical market data from two sources and stores it in Parquet format 
 - **Incremental fetch** -- Per-symbol checkpoint avoids re-downloads
 - **Contract manifest** -- Parquet catalog enables expiry-based queries
 - **Parallel downloads** -- ThreadPoolExecutor with rate limiting
+- **Live market monitor** -- One Upstox V3 WebSocket (LTPC) behind a
+  FastAPI + Next.js dashboard: NIFTY 50/100/200 · F&O / indices /
+  commodity option chains with live % change, reference-counted
+  subscriptions and a 5000-key budget
 
 ---
 
 ## Architecture
 
-The codebase follows a layered architecture with dependency injection:
+The codebase follows a layered architecture with dependency injection.  A
+**live-market layer** (Upstox Market Data Feed V3 WebSocket) sits beside
+the historical pipeline, sharing the same instrument master and domain
+models:
 
 ```
-CLI (cli.py)
-  |
-  v
-PipelineOrchestrator
-  |
-  +-- ProviderFactory (registry)
-  |     +-- NSEProvider
-  |     +-- UpstoxProvider
-  |     +-- UpstoxOptionsProvider
-  |
-  +-- Infrastructure Layer
-        +-- APIClients       (NseClient, UpstoxClient)
-        +-- Storage           (StorageRepository protocol,
-        |                      FileStorageRepository,
-        |                      ProviderLayout, FormatHandler,
-        |                      ContractManifest)
-        +-- Checkpoint        (JsonCheckpoint)
-        +-- Symbol Sources    (NseIndexConstituents,
-                               InstrumentMaster, OptionDiscoverer)
+                          Historical                       Live monitor
+                                                             │
+ CLI (cli.py)                                        FastAPI (live/app.py)
+   │                                                        │
+ PipelineOrchestrator                              LiveMarketHub  ── one Upstox V3
+   │                                                     │         WS connection (ltpc)
+   +-- ProviderFactory (registry)                       ├── watch_chain / unwatch
+   |     +-- NSEProvider                                │    (reference-counted)
+   |     +-- UpstoxProvider                             ├── quote store + % change
+   |     +-- UpstoxOptionsProvider                      └── 5000-key LTPC budget
+   |                                                        │
+   +-- Infrastructure Layer                                ├── WebSocket /ws  ── web/ (Next.js)
+         +-- APIClients       (NseClient, UpstoxClient)    └── REST /api (catalog + status)
+         +-- Storage           (StorageRepository protocol,
+         |                      FileStorageRepository,
+         |                      ProviderLayout, FormatHandler,
+         |                      ContractManifest)
+         +-- Checkpoint        (JsonCheckpoint)
+         +-- Symbol Sources    (NseIndexConstituents,
+                                InstrumentMaster (JSON BOD),
+                                OptionDiscoverer,
+                                UpstoxLiveCatalog)
 ```
 
 Data flow:
@@ -79,10 +89,18 @@ DataProvider (ABC)
   +-- UpstoxProvider            equities via Upstox V2 API
   +-- UpstoxOptionsProvider     F&O options + futures via Upstox V2 API
 
-InstrumentMaster                downloads / caches Upstox instrument master CSV
+InstrumentMaster                downloads / caches Upstox instrument master JSON
   +-- SymbolExporter            saves/loads ISIN-filtered equity symbol lists
   +-- OptionDiscoverer          discovers F&O contracts (stock + index)
   +-- ExpiryFilter              per-underlying expiry filtering
+
+UpstoxLiveCatalog               live option-chain indexes (indices / NSE F&O stocks /
+                                commodities incl. MCX), token -> instrument key map
+universe (module)               static NIFTY 50/100/200 lists, F&O intersection
+
+LiveMarketHub                   single V3 WS connection, refcounted subscriptions,
+                                quote store, reconnect + resubscribe, LTPC budget
+live/app.py + routes + ws       FastAPI: REST catalog + /ws browser protocol
 
 FileStorageRepository           delegates to:
   +-- ProviderLayout            filesystem path generation
@@ -161,7 +179,32 @@ nse-data-pipeline fetch [options]
 
 - `nse-data-pipeline list-providers` -- Show available data sources
 - `nse-data-pipeline list-indices` -- Show available NSE index constituent lists
+- `nse-data-pipeline live [--host HOST] [--port PORT]` -- Start the **live market monitor** (FastAPI + WebSocket backend for the `web/` dashboard)
 - `nse-data-pipeline --version` -- Show version
+
+### Live market monitor
+
+```
+nse-data-pipeline live --host 127.0.0.1 --port 8000
+```
+
+Starts a FastAPI server that owns a single Upstox Market Data Feed V3
+WebSocket connection (mode `ltpc`) and exposes:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Liveness probe |
+| `GET /api/status` | Feed state: connected, `subscribed / limit` keys, active chains |
+| `GET /api/universes` | NIFTY 50/100/200 static lists with live F&O eligibility counts |
+| `GET /api/underlyings/{indices\|stocks\|commodities}` | Underlyings with option chains |
+| `GET /api/expiries/{symbol}` | Upcoming expiry dates for an underlying |
+| `GET /api/chain/{symbol}?expiry=YYYY-MM-DD` | Strike-sorted CE/PE contract list |
+| `WS /ws` | Browser protocol: `watch` / `unwatch` / `ping`, batched `ticks` |
+
+Requires `UPSTOX_ANALYTICS_TOKEN` (server only, 1-year validity) for live
+prices; the catalog REST endpoints work without it. The frontend lives in
+`web/` (Next.js + shadcn): `cd web && pnpm install && pnpm dev` with
+`NEXT_PUBLIC_API_BASE` pointing at the backend.
 
 ### Provider comparison
 
@@ -183,8 +226,10 @@ nse-data-pipeline fetch [options]
 ### Contract discovery
 
 ```
-1. Upstox instrument master CSV (~200K rows) is downloaded
-   Filtered to exchange="NSE_FO"
+1. Upstox instrument master JSON BOD (complete.json.gz, ~123K rows) is
+   downloaded and cached (data/instruments/, TTL 12h, stale fallback).
+   The JSON schema is normalized to the legacy CSV-style columns
+   (OPTSTK/OPTIDX/FUTSTK/FUTIDX, CE/PE, date expiry, ISIN number).
 
 2. For STOCK OPTIONS (OPTSTK):
    Nifty 50 ISINs are matched against Upstox NSE_EQ instruments
@@ -362,10 +407,12 @@ src/nse_data_pipeline/
 
   domain/
     models.py                      Domain models: OptionContract, enums, value objects
+    live_models.py                 LiveQuote, ChainDefinition, LiveOptionContract
     coverage.py                    CoverageRange, CheckpointData
 
   application/
     fetch_service.py               PipelineOrchestrator + ProviderFactory
+    live_market_hub.py             LiveMarketHub (live V3 feed manager)
 
   infrastructure/
     api/
@@ -383,19 +430,35 @@ src/nse_data_pipeline/
     symbol_source/
       nse_index_csv.py             NSE index constituent fetcher (NseIndexConstituents,
                                    IndexCsvCatalog)
-      upstox_instruments.py        InstrumentMaster, SymbolExporter,
-                                   OptionDiscoverer, ExpiryFilter
+      upstox_instruments.py        InstrumentMaster (JSON BOD + normalizer),
+                                   SymbolExporter, OptionDiscoverer, ExpiryFilter
+      upstox_live_catalog.py       UpstoxLiveCatalog (live chain indexes)
+      universe.py                  Static NIFTY 50/100/200 lists + F&O intersection
   pipeline/
     base.py                        DataProvider ABC
     nse_provider.py                NSE equity + index fetching
     upstox_provider.py             Upstox equity fetching
     upstox_options_provider.py     F&O options + futures fetching
 
+  application/
+    live_market_hub.py             LiveMarketHub (V3 WS, refcounted subscriptions,
+                                   quote store, reconnect, budget)
+
+  live/
+    app.py                         FastAPI app factory + broadcast loop
+    routes.py                      REST catalog endpoints
+    websocket.py                   /ws browser protocol + ConnectionManager
+
   shared/
     rate_limiter.py                Exponential backoff rate limiter
     exceptions.py                  Domain exception hierarchy
     utils.py                       Date helpers
 ```
+
+Frontend (`web/`, Next.js + shadcn): `src/lib/market-store.ts` (WS client +
+quote store), `src/hooks/use-market-feed.ts`, `src/components/market/`
+(universe-picker, chain-workspace, option-chain-panel, chain/movers tables,
+connection-status).
 
 ---
 
@@ -416,12 +479,17 @@ Copy `.env.example` -> `.env` and adjust as needed. All defaults work out of the
 | `UPSTOX_INTERVAL` | `month` | Candle interval |
 | `UPSTOX_MAX_WORKERS` | `10` | Parallel workers |
 | `UPSTOX_FETCH_START` | `01-01-2000` | Fetch start |
+| `UPSTOX_INSTRUMENTS_URL` | `complete.json.gz` | Instrument master (JSON BOD; CSV is deprecated) |
+| `UPSTOX_INSTRUMENTS_CACHE_TTL_HOURS` | `12` | Instrument master cache TTL |
 | **Upstox (F&O)** | | |
 | `UPSTOX_OPTIONS_INTERVAL` | `day` | Options interval |
 | `UPSTOX_OPTIONS_FETCH_START` | `01-01-2024` | Fetch start |
 | `UPSTOX_OPTIONS_TYPES` | `OPTSTK` | F&O types to fetch |
 | `UPSTOX_OPTIONS_N_EXPIRIES` | `2` | Expiry cycles per underlying |
 | `UPSTOX_OPTIONS_INDEX_NAMES` | (auto) | Restrict index options |
+| **Upstox (live monitor)** | | |
+| `UPSTOX_ANALYTICS_TOKEN` | (empty) | Analytics token for Market Data Feed V3 (server only, 1-year validity) |
+| `UPSTOX_LIVE_MAX_KEYS` | `5000` | LTPC subscription budget per connection |
 
 Rate limiter: `NSE_RATE_INITIAL_DELAY=0.5`, `NSE_RATE_MAX_DELAY=30.0`, `NSE_RATE_BACKOFF_FACTOR=2.0`, `NSE_FETCH_MAX_RETRIES=5`
 

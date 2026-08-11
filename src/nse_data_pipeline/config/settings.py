@@ -127,6 +127,10 @@ class Settings:
     upstox_options_n_expiries: int = 2
     upstox_options_index_names: str = ""
 
+    # --- Upstox live market feed ---
+    upstox_analytics_token: str = ""
+    upstox_live_max_keys: int = 5000
+
     # --- Rate limiter ---
     rate_initial_delay: float = 0.5
     rate_max_delay: float = 30.0
@@ -191,6 +195,8 @@ class Settings:
             upstox_options_types=os.getenv("UPSTOX_OPTIONS_TYPES", "OPTSTK"),
             upstox_options_n_expiries=int(os.getenv("UPSTOX_OPTIONS_N_EXPIRIES", "2")),
             upstox_options_index_names=os.getenv("UPSTOX_OPTIONS_INDEX_NAMES", ""),
+            upstox_analytics_token=os.getenv("UPSTOX_ANALYTICS_TOKEN", ""),
+            upstox_live_max_keys=int(os.getenv("UPSTOX_LIVE_MAX_KEYS", "5000")),
             rate_initial_delay=float(os.getenv("NSE_RATE_INITIAL_DELAY", "0.5")),
             rate_max_delay=float(os.getenv("NSE_RATE_MAX_DELAY", "30.0")),
             rate_backoff_factor=float(os.getenv("NSE_RATE_BACKOFF_FACTOR", "2.0")),

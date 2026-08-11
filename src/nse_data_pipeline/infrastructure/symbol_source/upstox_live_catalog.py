@@ -102,6 +102,17 @@ class UpstoxLiveCatalog:
     def contract(self, instrument_key: str) -> LiveOptionContract | None:
         return self.by_instrument_key().get(instrument_key)
 
+    def token_to_instrument_key(self) -> dict[str, str]:
+        """Map feed exchange-tokens → instrument keys.
+
+        Upstox WS messages key feeds by the numeric exchange token; this
+        index reverses that to full instrument keys.
+        """
+        df = self._master.download()
+        tokens = df["exchange_token"].astype(str).str.strip()
+        keys = df["instrument_key"].astype(str)
+        return {t: k for t, k in zip(tokens, keys, strict=False) if t}
+
     def eligible_from_universe(self, symbols: set[str]) -> set[str]:
         """Intersect a universe list with underlyings that actually have F&O."""
         available = set(self.list_underlyings(AssetGroup.NSE_FNO_STOCKS))

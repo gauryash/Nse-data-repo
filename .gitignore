@@ -30,6 +30,9 @@ data/parquet/*.parquet
 # Checkpoint files (auto-generated, per-provider metadata)
 data/**/_checkpoint.json
 
+# Instrument master cache (downloaded BOD JSON)
+data/instruments/
+
 # Generated analysis output files
 analysis/*.csv
 analysis/*.txt

@@ -110,8 +110,9 @@ class Settings:
     # --- Upstox API (equities) ---
     upstox_base_url: str = "https://api.upstox.com/v2/historical-candle"
     upstox_instruments_url: str = (
-        "https://assets.upstox.com/market-quote/instruments/exchange/complete.csv.gz"
+        "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz"
     )
+    upstox_instruments_cache_ttl_hours: float = 12.0
     upstox_interval: CandleInterval = CandleInterval.MONTH
     upstox_max_workers: int = 10
     upstox_chunk_years: int = 5
@@ -138,14 +139,17 @@ class Settings:
     nse_storage_dir: Path = field(init=False)
     upstox_storage_dir: Path = field(init=False)
     upstox_options_storage_dir: Path = field(init=False)
+    instruments_cache_dir: Path = field(init=False)
 
     def __post_init__(self) -> None:
         self.nse_storage_dir = self.data_dir / "nse"
         self.upstox_storage_dir = self.data_dir / "upstox"
         self.upstox_options_storage_dir = self.data_dir / "upstox_options"
+        self.instruments_cache_dir = self.data_dir / "instruments"
         self.nse_storage_dir.mkdir(parents=True, exist_ok=True)
         self.upstox_storage_dir.mkdir(parents=True, exist_ok=True)
         self.upstox_options_storage_dir.mkdir(parents=True, exist_ok=True)
+        self.instruments_cache_dir.mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -173,6 +177,13 @@ class Settings:
             upstox_max_workers=int(os.getenv("UPSTOX_MAX_WORKERS", "10")),
             upstox_chunk_years=int(os.getenv("UPSTOX_CHUNK_YEARS", "5")),
             upstox_fetch_start=os.getenv("UPSTOX_FETCH_START", "01-01-2000"),
+            upstox_instruments_url=os.getenv(
+                "UPSTOX_INSTRUMENTS_URL",
+                "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz",
+            ),
+            upstox_instruments_cache_ttl_hours=float(
+                os.getenv("UPSTOX_INSTRUMENTS_CACHE_TTL_HOURS", "12")
+            ),
             upstox_options_interval=CandleInterval(os.getenv("UPSTOX_OPTIONS_INTERVAL", "day")),
             upstox_options_max_workers=int(os.getenv("UPSTOX_OPTIONS_MAX_WORKERS", "5")),
             upstox_options_chunk_years=int(os.getenv("UPSTOX_OPTIONS_CHUNK_YEARS", "2")),

@@ -1,22 +1,38 @@
 """
 Upstox instrument master download and filtering.
 
-The Upstox instrument master CSV (``complete.csv.gz`` from Upstox assets)
-contains all exchange-traded instruments.  This module provides classes
-to filter it for NSE equities (by ISIN) and NSE F&O contracts (by
-instrument type and underlying name).
+The Upstox instrument master BOD file (``complete.json.gz`` from Upstox
+assets, refreshed ~6 AM) contains all exchange-traded instruments.  This
+module provides classes to filter it for NSE equities (by ISIN) and NSE
+F&O contracts (by instrument type and underlying name).
 
-Cache note: the instrument master is NOT cached by default because it
-changes daily (new contracts added, expired contracts removed).
-Each call downloads the latest version.
+The JSON schema differs from the old CSV: ``instrument_type`` is ``CE`` /
+``PE`` / ``FUT`` / ``EQ`` / ``INDEX`` / ``COM``, ``underlying_type`` is
+``EQUITY`` / ``INDEX`` / ``COM`` / ``CUR``, ``expiry`` is an epoch-millis
+timestamp and there is no ``option_type`` column.  :func:`normalize_json_rows`
+converts the JSON rows into the legacy CSV-style DataFrame the rest of the
+pipeline consumes (``OPTSTK`` / ``OPTIDX`` / ``FUTSTK`` / ``FUTIDX``, CE/PE,
+date-typed ``expiry``, ``strike``, ``tradingsymbol``, ``exchange`` = segment).
+
+Cache note: the instrument master is cached to disk (``data/instruments/``)
+for ``settings.upstox_instruments_cache_ttl_hours`` hours.  A stale cache is
+refreshed in the background of the request; if the network fails, the stale
+copy is used as a fallback.
 """
 
 from __future__ import annotations
 
+import contextlib
+import gzip
+import json
+import time
 from datetime import date as date_type
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
+import requests
 
 from nse_data_pipeline.config.logger import get_logger
 from nse_data_pipeline.config.settings import settings
@@ -24,28 +40,152 @@ from nse_data_pipeline.domain.models import OptionContract
 
 logger = get_logger(__name__)
 
+_CACHE_FILENAME = "complete.json.gz"
+
+
+# ----------------------------------------------------------------------
+# JSON BOD → legacy CSV-style schema normalisation
+# ----------------------------------------------------------------------
+
+
+def _epoch_ms_to_date(value: Any) -> date_type | None:
+    """Convert an epoch-millis expiry timestamp to a date (UTC)."""
+    if value is None:
+        return None
+    try:
+        ms = float(value)
+    except (TypeError, ValueError):
+        return None
+    if ms <= 0:
+        return None
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).date()
+
+
+def _map_instrument_type(row: dict[str, Any]) -> str:
+    """Map JSON instrument_type + underlying_type to legacy F&O types."""
+    it = str(row.get("instrument_type") or "")
+    ut = str(row.get("underlying_type") or "")
+    if it in ("CE", "PE"):
+        if ut == "EQUITY":
+            return "OPTSTK"
+        if ut == "INDEX":
+            return "OPTIDX"
+        return it  # COM / CUR (MCX, currency) keep CE/PE
+    if it == "FUT":
+        if ut == "EQUITY":
+            return "FUTSTK"
+        if ut == "INDEX":
+            return "FUTIDX"
+        return it
+    return it
+
+
+def _map_option_type(instrument_type: str) -> str:
+    """Derive the legacy option_type column from the raw JSON instrument type."""
+    return {"CE": "CE", "PE": "PE", "FUT": "FF"}.get(instrument_type, "")
+
+
+def normalize_json_rows(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    """Convert raw BOD JSON rows into the legacy CSV-style DataFrame.
+
+    Emits the same columns the historical pipeline consumes:
+    ``instrument_key, exchange_token, tradingsymbol, name, expiry, strike,
+    tick_size, lot_size, instrument_type, option_type, exchange, ISIN_NUMBER``
+    plus JSON-native columns kept for the live catalog
+    (``underlying_type, underlying_symbol, asset_symbol, segment, weekly``).
+    """
+    records: list[dict[str, Any]] = []
+    for row in rows:
+        raw_instrument_type = str(row.get("instrument_type") or "")
+        instrument_type = _map_instrument_type(row)
+        records.append(
+            {
+                "instrument_key": row.get("instrument_key") or "",
+                "exchange_token": row.get("exchange_token") or "",
+                "tradingsymbol": row.get("trading_symbol") or "",
+                "name": row.get("name") or "",
+                "expiry": _epoch_ms_to_date(row.get("expiry")),
+                "strike": row.get("strike_price"),
+                "tick_size": row.get("tick_size"),
+                "lot_size": row.get("lot_size"),
+                "instrument_type": instrument_type,
+                "option_type": _map_option_type(raw_instrument_type),
+                "exchange": row.get("segment") or "",
+                "underlying_type": row.get("underlying_type") or "",
+                "underlying_symbol": row.get("underlying_symbol") or "",
+                "asset_symbol": row.get("asset_symbol") or "",
+                "segment": row.get("segment") or "",
+                "weekly": row.get("weekly") or False,
+            }
+        )
+    return pd.DataFrame(records)
+
 
 class InstrumentMaster:
-    """Downloads and parses the Upstox instrument master CSV.
+    """Downloads and parses the Upstox instrument master JSON.
 
     Provides low-level filtering helpers for NSE_EQ and NSE_FO instruments.
     """
 
-    def __init__(self, url: str = "") -> None:
+    def __init__(
+        self,
+        url: str = "",
+        cache_path: Path | None = None,
+        ttl_hours: float | None = None,
+    ) -> None:
         self._url = url or settings.upstox_instruments_url
+        self._cache_path = cache_path or settings.instruments_cache_dir / _CACHE_FILENAME
+        self._ttl_hours = (
+            ttl_hours if ttl_hours is not None else settings.upstox_instruments_cache_ttl_hours
+        )
+        self._rows: list[dict[str, Any]] | None = None
         self._df: pd.DataFrame | None = None
 
+    # ------------------------------------------------------------------
+    # Loading
+    # ------------------------------------------------------------------
+
+    def download_raw(self) -> list[dict[str, Any]]:
+        """Return the parsed JSON rows (cache-aware).
+
+        A fresh on-disk cache is reused; a stale cache is refreshed but kept
+        as a fallback if the network is unavailable.
+        """
+        if self._rows is not None:
+            return self._rows
+        cached = self._cache_path
+        if cached.exists() and self._is_fresh(cached):
+            self._rows = self._read_cache(cached)
+            if self._rows is not None:
+                return self._rows
+        try:
+            rows = self._fetch_rows()
+            self._write_cache(rows)
+            self._rows = rows
+            return rows
+        except Exception as e:
+            if cached.exists():
+                logger.warning(
+                    "Instrument master download failed (%s) — using stale cache %s",
+                    e,
+                    cached,
+                )
+                fallback = self._read_cache(cached)
+                if fallback is not None:
+                    self._rows = fallback
+                    return fallback
+            raise
+
     def download(self) -> pd.DataFrame:
-        """Download and parse the full instrument master CSV.
+        """Download and parse the full instrument master JSON.
 
         Returns:
-            DataFrame with columns from the master CSV, plus a derived
-            ``ISIN_NUMBER`` column.
+            DataFrame with the legacy CSV-style columns (see
+            :func:`normalize_json_rows`) plus a derived ``ISIN_NUMBER`` column.
         """
         if self._df is not None:
             return self._df
-        df = pd.read_csv(self._url, compression="gzip")
-        df["expiry"] = pd.to_datetime(df["expiry"], errors="coerce").dt.date
+        df = normalize_json_rows(self.download_raw())
         df["ISIN_NUMBER"] = df["instrument_key"].str.split("|").str[-1]
         self._df = df
         return df
@@ -53,6 +193,13 @@ class InstrumentMaster:
     def invalidate_cache(self) -> None:
         """Force the next call to :meth:`download` to re-fetch."""
         self._df = None
+        self._rows = None
+        with contextlib.suppress(FileNotFoundError):
+            self._cache_path.unlink()
+
+    # ------------------------------------------------------------------
+    # Filtering
+    # ------------------------------------------------------------------
 
     def get_equities(self) -> pd.DataFrame:
         """Return all NSE_EQ instruments."""
@@ -74,6 +221,34 @@ class InstrumentMaster:
         """Filter NSE_FO instruments by instrument type list."""
         fno = self.get_fno()
         return fno[fno["instrument_type"].isin(instrument_types)]
+
+    # ------------------------------------------------------------------
+    # Cache internals
+    # ------------------------------------------------------------------
+
+    def _is_fresh(self, path: Path) -> bool:
+        age_hours = (time.time() - path.stat().st_mtime) / 3600.0
+        return age_hours < self._ttl_hours
+
+    def _read_cache(self, path: Path) -> list[dict[str, Any]] | None:
+        try:
+            return json.loads(gzip.decompress(path.read_bytes()))
+        except Exception as e:
+            logger.warning("Failed to read instrument master cache %s: %s", path, e)
+            return None
+
+    def _write_cache(self, rows: list[dict[str, Any]]) -> None:
+        try:
+            self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+            self._cache_path.write_bytes(gzip.compress(json.dumps(rows).encode()))
+        except Exception as e:
+            logger.warning("Failed to write instrument master cache: %s", e)
+
+    def _fetch_rows(self) -> list[dict[str, Any]]:
+        logger.info("Downloading Upstox instrument master from %s", self._url)
+        r = requests.get(self._url, timeout=120)
+        r.raise_for_status()
+        return json.loads(gzip.decompress(r.content))
 
 
 class SymbolExporter:

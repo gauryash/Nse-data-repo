@@ -72,6 +72,14 @@ class UpstoxLiveCatalog:
         symbols = {c.underlying_symbol for c in self.contracts() if c.asset_group is group}
         return sorted(symbols)
 
+    def underlying_details(self, group: AssetGroup) -> list[tuple[str, str]]:
+        """Sorted ``(underlying_symbol, display_name)`` pairs for a group."""
+        seen: dict[str, str] = {}
+        for c in self.contracts():
+            if c.asset_group is group:
+                seen.setdefault(c.underlying_symbol, c.underlying_name)
+        return sorted(seen.items())
+
     def expiries(self, underlying_symbol: str) -> list[date]:
         """Sorted ascending unique expiry dates for an underlying."""
         expiries = {

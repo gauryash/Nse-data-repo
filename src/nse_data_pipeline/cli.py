@@ -131,6 +131,28 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("list-providers", help="List available data providers")
     sub.add_parser("list-indices", help="List available NSE index constituent lists")
 
+    # ---- live monitor ----
+    live_parser = sub.add_parser(
+        "live",
+        help="Start the live market monitor (FastAPI + WebSocket)",
+    )
+    live_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bind address (default: 127.0.0.1)",
+    )
+    live_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Bind port (default: 8000)",
+    )
+    live_parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable uvicorn auto-reload (dev only)",
+    )
+
     return parser
 
 
@@ -176,6 +198,12 @@ def _cmd_list_indices() -> None:
         print(f"  - {name}")
 
 
+def _cmd_live(args: argparse.Namespace) -> None:
+    from nse_data_pipeline.live.app import run_server
+
+    run_server(host=args.host, port=args.port, reload=args.reload)
+
+
 # ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
@@ -193,6 +221,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         _cmd_list_providers()
     elif args.command == "list-indices":
         _cmd_list_indices()
+    elif args.command == "live":
+        _cmd_live(args)
     else:
         parser.print_help()
         sys.exit(1)

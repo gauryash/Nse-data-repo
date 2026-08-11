@@ -85,6 +85,12 @@ class LiveMarketHub:
         if self._started:
             return
         self._started = True
+        if not self._token:
+            logger.warning(
+                "UPSTOX_ANALYTICS_TOKEN not set — feed stays disconnected; "
+                "REST catalog endpoints still available."
+            )
+            return
         if self._streamer is None:
             self._streamer = build_upstox_streamer(self._token)
         self._streamer.on("open", self._on_open)
